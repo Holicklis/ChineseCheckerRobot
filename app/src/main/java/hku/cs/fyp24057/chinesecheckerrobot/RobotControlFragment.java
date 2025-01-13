@@ -42,7 +42,7 @@ public class RobotControlFragment extends Fragment {
     private float z = INT_Z;
     private float t = INT_T;  // wrist angle
 
-    // Robot default IP in AP mode. Adjust if needed
+    // Robot default IP in AP mode.
     private String robotIp = "192.168.4.1";
 
     // Movement increments
