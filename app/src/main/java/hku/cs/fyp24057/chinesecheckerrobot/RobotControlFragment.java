@@ -9,6 +9,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.Switch;
 import android.widget.Toast;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -18,17 +19,32 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 
-/**
- * A simple {@link Fragment} subclass that controls a robot arm using Wi-Fi (HTTP) or wired mode.
- */
 public class RobotControlFragment extends Fragment {
+    private static final String TAG = "RobotControlFragment";
 
+    // UI Elements
     private Switch switchCommMode;
     private Button btnUp, btnDown, btnLeft, btnRight;
     private Button btnZUp, btnZDown;
     private Button btnTorqueLeft, btnTorqueRight;
     private Button btnReset;
+
+    // Lock and synchronization
+    private final ReentrantLock commandLock = new ReentrantLock();
+    private final AtomicBoolean isCommandInProgress = new AtomicBoolean(false);
+    private long lastCommandTime = 0;
+    private static final long MIN_COMMAND_INTERVAL = 20; // Minimum time between commands in ms
+
+    // Movement state tracking
+    private boolean isMoving = false;
+    private MovementDirection currentDirection = MovementDirection.NONE;
+
+    private enum MovementDirection {
+        NONE, UP, DOWN, LEFT, RIGHT, Z_UP, Z_DOWN, T_LEFT, T_RIGHT
+    }
 
     // Initial coordinates
     private static final float INT_X = 304.24f;
@@ -36,120 +52,171 @@ public class RobotControlFragment extends Fragment {
     private static final float INT_Z = 240.92f;
     private static final float INT_T = 3.14f;
 
-    // Coordinates and orientation
+    // Current coordinates
     private float x = INT_X;
     private float y = INT_Y;
     private float z = INT_Z;
     private float t = INT_T;  // wrist angle
 
-    // Robot default IP in AP mode.
+    // Robot configuration
     private String robotIp = "192.168.4.1";
 
     // Movement increments
-    private final float MOVE_STEP_X = 5.0f;  // For X direction (Up/Down buttons)
-    private final float MOVE_STEP_Y = 5.0f;  // For Y direction (Left/Right buttons)
-    private final float MOVE_STEP_Z = 5.0f;  // For Z up/down
-    private final float TORQUE_STEP = 0.5f;   // For wrist angle
-
-    // Interval (ms) between repeated moves while a button is held
-    private static final long REPEAT_INTERVAL_MS = 10;
-
-    public RobotControlFragment() {
-        // Required empty public constructor
-    }
+    private final float MOVE_STEP_X = 5.0f;
+    private final float MOVE_STEP_Y = 5.0f;
+    private final float MOVE_STEP_Z = 5.0f;
+    private final float TORQUE_STEP = 0.5f;
 
     @Override
-    public View onCreateView(
-            @NonNull LayoutInflater inflater,
-            ViewGroup container,
-            Bundle savedInstanceState
-    ) {
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_robot_control, container, false);
     }
 
     @Override
-    public void onViewCreated(
-            @NonNull View view,
-            @Nullable Bundle savedInstanceState
-    ) {
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        initializeViews(view);
+        setupButtonListeners();
+    }
 
-        // Bind views
+    private void initializeViews(View view) {
         switchCommMode = view.findViewById(R.id.switchCommMode);
-        btnUp          = view.findViewById(R.id.btnUp);
-        btnDown        = view.findViewById(R.id.btnDown);
-        btnLeft        = view.findViewById(R.id.btnLeft);
-        btnRight       = view.findViewById(R.id.btnRight);
-        btnZUp         = view.findViewById(R.id.btnZUp);
-        btnZDown       = view.findViewById(R.id.btnZDown);
-        btnTorqueLeft  = view.findViewById(R.id.btnTorqueLeft);
+        btnUp = view.findViewById(R.id.btnUp);
+        btnDown = view.findViewById(R.id.btnDown);
+        btnLeft = view.findViewById(R.id.btnLeft);
+        btnRight = view.findViewById(R.id.btnRight);
+        btnZUp = view.findViewById(R.id.btnZUp);
+        btnZDown = view.findViewById(R.id.btnZDown);
+        btnTorqueLeft = view.findViewById(R.id.btnTorqueLeft);
         btnTorqueRight = view.findViewById(R.id.btnTorqueRight);
-        btnReset       = view.findViewById(R.id.btnReset);
+        btnReset = view.findViewById(R.id.btnReset);
+    }
 
-        // 1) Up button => X increases
-        setButtonHoldListener(btnUp, () -> {
-            x += MOVE_STEP_X;
-            sendArmCommand(1041);
+    private void setupButtonListeners() {
+        // Up button (X+)
+        setButtonListener(btnUp, () -> {
+            synchronized(commandLock) {
+                if (canSendCommand()) {
+                    x += MOVE_STEP_X;
+                    currentDirection = MovementDirection.UP;
+                    sendArmCommand(1041);
+                    updateLastCommandTime();
+                }
+            }
         });
 
-        // 2) Down button => X decreases
-        setButtonHoldListener(btnDown, () -> {
-            x -= MOVE_STEP_X;
-            sendArmCommand(1041);
+        // Down button (X-)
+        setButtonListener(btnDown, () -> {
+            synchronized(commandLock) {
+                if (canSendCommand()) {
+                    x -= MOVE_STEP_X;
+                    currentDirection = MovementDirection.DOWN;
+                    sendArmCommand(1041);
+                    updateLastCommandTime();
+                }
+            }
         });
 
-        // 3) Left button => Y **increases** (SWITCHED!)
-        setButtonHoldListener(btnLeft, () -> {
-            y += MOVE_STEP_Y;
-            sendArmCommand(1041);
+        // Left button (Y+)
+        setButtonListener(btnLeft, () -> {
+            synchronized(commandLock) {
+                if (canSendCommand()) {
+                    y += MOVE_STEP_Y;
+                    currentDirection = MovementDirection.LEFT;
+                    sendArmCommand(1041);
+                    updateLastCommandTime();
+                }
+            }
         });
 
-        // 4) Right button => Y **decreases** (SWITCHED!)
-        setButtonHoldListener(btnRight, () -> {
-            y -= MOVE_STEP_Y;
-            sendArmCommand(1041);
+        // Right button (Y-)
+        setButtonListener(btnRight, () -> {
+            synchronized(commandLock) {
+                if (canSendCommand()) {
+                    y -= MOVE_STEP_Y;
+                    currentDirection = MovementDirection.RIGHT;
+                    sendArmCommand(1041);
+                    updateLastCommandTime();
+                }
+            }
         });
 
-        // 5) Z Up => z increases
-        setButtonHoldListener(btnZUp, () -> {
-            z += MOVE_STEP_Z;
-            sendArmCommand(1041);
+        // Z Up
+        setButtonListener(btnZUp, () -> {
+            synchronized(commandLock) {
+                if (canSendCommand()) {
+                    z += MOVE_STEP_Z;
+                    currentDirection = MovementDirection.Z_UP;
+                    sendArmCommand(1041);
+                    updateLastCommandTime();
+                }
+            }
         });
 
-        // 6) Z Down => z decreases
-        setButtonHoldListener(btnZDown, () -> {
-            z -= MOVE_STEP_Z;
-            sendArmCommand(1041);
+        // Z Down
+        setButtonListener(btnZDown, () -> {
+            synchronized(commandLock) {
+                if (canSendCommand()) {
+                    z -= MOVE_STEP_Z;
+                    currentDirection = MovementDirection.Z_DOWN;
+                    sendArmCommand(1041);
+                    updateLastCommandTime();
+                }
+            }
         });
 
-        // 7) Torque Left => t decreases
-        setButtonHoldListener(btnTorqueLeft, () -> {
-            t -= TORQUE_STEP;
-            sendArmCommand(1041);
+        // Torque Left
+        setButtonListener(btnTorqueLeft, () -> {
+            synchronized(commandLock) {
+                if (canSendCommand()) {
+                    t -= TORQUE_STEP;
+                    currentDirection = MovementDirection.T_LEFT;
+                    sendArmCommand(1041);
+                    updateLastCommandTime();
+                }
+            }
         });
 
-        // 8) Torque Right => t increases
-        setButtonHoldListener(btnTorqueRight, () -> {
-            t += TORQUE_STEP;
-            sendArmCommand(1041);
+        // Torque Right
+        setButtonListener(btnTorqueRight, () -> {
+            synchronized(commandLock) {
+                if (canSendCommand()) {
+                    t += TORQUE_STEP;
+                    currentDirection = MovementDirection.T_RIGHT;
+                    sendArmCommand(1041);
+                    updateLastCommandTime();
+                }
+            }
         });
 
-        // 9) Reset => CMD_MOVE_INIT
+        // Reset button
         btnReset.setOnClickListener(v -> {
-            // Reset all coordinates to initial
-            x = INT_X;
-            y = INT_Y;
-            z = INT_Z;
-            t = INT_T;
-            sendArmCommand(100);  // CMD_MOVE_INIT
+            synchronized(commandLock) {
+                if (canSendCommand()) {
+                    x = INT_X;
+                    y = INT_Y;
+                    z = INT_Z;
+                    t = INT_T;
+                    currentDirection = MovementDirection.NONE;
+                    sendArmCommand(100);
+                    updateLastCommandTime();
+                }
+            }
         });
     }
 
-    /**
-     * Helper to set a press-and-hold listener on a button. Repeats the given action
-     * every REPEAT_INTERVAL_MS while the button is pressed.
-     */
-    private void setButtonHoldListener(Button button, Runnable action) {
+    private boolean canSendCommand() {
+        long currentTime = System.currentTimeMillis();
+        return !isCommandInProgress.get() &&
+                (currentTime - lastCommandTime) >= MIN_COMMAND_INTERVAL;
+    }
+
+    private void updateLastCommandTime() {
+        lastCommandTime = System.currentTimeMillis();
+    }
+
+    private void setButtonListener(Button button, Runnable action) {
         button.setOnTouchListener(new View.OnTouchListener() {
             private boolean isHeld = false;
             private final Handler handler = new Handler();
@@ -158,10 +225,8 @@ public class RobotControlFragment extends Fragment {
                 @Override
                 public void run() {
                     if (isHeld) {
-                        // Execute the movement action
                         action.run();
-                        // Schedule next repeat
-                        handler.postDelayed(this, REPEAT_INTERVAL_MS);
+                        handler.postDelayed(this, MIN_COMMAND_INTERVAL);
                     }
                 }
             };
@@ -170,15 +235,16 @@ public class RobotControlFragment extends Fragment {
             public boolean onTouch(View v, MotionEvent event) {
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
-                        // Start repeating
                         isHeld = true;
+                        isMoving = true;
                         handler.post(repeatAction);
-                        // Return true indicates we've handled this event
                         return true;
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
-                        // Stop repeating
                         isHeld = false;
+                        isMoving = false;
+                        currentDirection = MovementDirection.NONE;
+                        handler.removeCallbacks(repeatAction);
                         return true;
                 }
                 return false;
@@ -186,50 +252,30 @@ public class RobotControlFragment extends Fragment {
         });
     }
 
-    /**
-     * Sends a JSON command to the robot arm.
-     *
-     * @param cmdType The "T" field in the JSON; for example:
-     *                - 100 for CMD_MOVE_INIT (reset to initial position)
-     *                - 1041 for CMD_XYZT_DIRECT_CTRL (move to specified x,y,z,t)
-     */
     private void sendArmCommand(int cmdType) {
-        boolean useWiFi = switchCommMode.isChecked();
-
-        if (!useWiFi) {
-            // Placeholder logic for future wired mode
-            Toast.makeText(getActivity(),
-                    "Wired mode (not implemented). Current coords => x=" + x
-                            + ", y=" + y + ", z=" + z + ", t=" + t,
-                    Toast.LENGTH_SHORT).show();
+        if (!switchCommMode.isChecked()) {
+            showToast(String.format("Wired mode (not implemented). Coords: x=%.2f, y=%.2f, z=%.2f, t=%.2f",
+                    x, y, z, t));
             return;
         }
 
-        // Build JSON command
+        isCommandInProgress.set(true);
+
         String jsonCmd;
         if (cmdType == 100) {
-            // CMD_MOVE_INIT => reset
             jsonCmd = "{\"T\":100}";
         } else if (cmdType == 1041) {
-            // CMD_XYZT_DIRECT_CTRL => move to (x, y, z, t)
             jsonCmd = String.format(
                     "{\"T\":1041,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f}",
                     x, y, z, t
             );
-
-            // Optional Toast for debugging
-            Toast.makeText(getActivity(),
-                    String.format("Moving to x=%.2f, y=%.2f, z=%.2f, t=%.2f", x, y, z, t),
-                    Toast.LENGTH_SHORT).show();
+            Log.d(TAG, String.format("Sending command: x=%.2f, y=%.2f, z=%.2f, t=%.2f", x, y, z, t));
         } else {
-            // Other command types
             jsonCmd = String.format("{\"T\":%d}", cmdType);
         }
 
-        // Construct the HTTP GET request
         final String requestUrl = "http://" + robotIp + "/js?json=" + jsonCmd;
 
-        // Run network operation in a separate thread
         new Thread(() -> {
             HttpURLConnection conn = null;
             BufferedReader reader = null;
@@ -249,41 +295,37 @@ public class RobotControlFragment extends Fragment {
                     while ((line = reader.readLine()) != null) {
                         sb.append(line);
                     }
-                    String response = sb.toString();  // The response from the robot
-
-                    // Show the response in a Toast on the main thread
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(() ->
-                                Toast.makeText(getActivity(),
-                                        "Response: " + response,
-                                        Toast.LENGTH_SHORT).show());
-                    }
-                } else {
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(() ->
-                                Toast.makeText(getActivity(),
-                                        "HTTP Error: " + responseCode,
-                                        Toast.LENGTH_SHORT).show());
-                    }
+                    String response = sb.toString();
+                    Log.d(TAG, "Response: " + response);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() ->
-                            Toast.makeText(getActivity(),
-                                    "Exception: " + e.getMessage(),
-                                    Toast.LENGTH_SHORT).show());
-                }
+                Log.e(TAG, "Error sending command", e);
+                showToast("Error: " + e.getMessage());
             } finally {
-                if (reader != null) {
-                    try {
-                        reader.close();
-                    } catch (Exception ignored) {}
-                }
-                if (conn != null) {
-                    conn.disconnect();
-                }
+                try {
+                    if (reader != null) reader.close();
+                    if (conn != null) conn.disconnect();
+                } catch (Exception ignored) {}
+                isCommandInProgress.set(false);
             }
         }).start();
+    }
+
+    private void showToast(String message) {
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() ->
+                    Toast.makeText(getActivity(), message, Toast.LENGTH_SHORT).show()
+            );
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        synchronized(commandLock) {
+            isMoving = false;
+            currentDirection = MovementDirection.NONE;
+            isCommandInProgress.set(false);
+        }
     }
 }
