@@ -2,6 +2,7 @@ package hku.cs.fyp24057.chinesecheckerrobot;
 
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -19,8 +20,12 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class RobotControlFragment extends Fragment {
     private static final String TAG = "RobotControlFragment";
@@ -32,8 +37,9 @@ public class RobotControlFragment extends Fragment {
     private Button btnTorqueLeft, btnTorqueRight;
     private Button btnReset;
 
-    // Lock and synchronization
-    private final ReentrantLock commandLock = new ReentrantLock();
+    // Command processing
+    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private final BlockingQueue<Command> commandQueue = new LinkedBlockingQueue<>();
     private final AtomicBoolean isCommandInProgress = new AtomicBoolean(false);
     private long lastCommandTime = 0;
     private static final long MIN_COMMAND_INTERVAL = 20; // Minimum time between commands in ms
@@ -44,6 +50,20 @@ public class RobotControlFragment extends Fragment {
 
     private enum MovementDirection {
         NONE, UP, DOWN, LEFT, RIGHT, Z_UP, Z_DOWN, T_LEFT, T_RIGHT
+    }
+
+    // Command class to encapsulate command data
+    private static class Command {
+        final int cmdType;
+        final float x, y, z, t;
+
+        Command(int cmdType, float x, float y, float z, float t) {
+            this.cmdType = cmdType;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.t = t;
+        }
     }
 
     // Initial coordinates
@@ -78,6 +98,7 @@ public class RobotControlFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         initializeViews(view);
         setupButtonListeners();
+        startCommandProcessor();
     }
 
     private void initializeViews(View view) {
@@ -93,133 +114,112 @@ public class RobotControlFragment extends Fragment {
         btnReset = view.findViewById(R.id.btnReset);
     }
 
+    private void startCommandProcessor() {
+        executorService.submit(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    Command cmd = commandQueue.poll(100, TimeUnit.MILLISECONDS);
+                    if (cmd != null) {
+                        processCommand(cmd);
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        });
+    }
+
     private void setupButtonListeners() {
         // Up button (X+)
         setButtonListener(btnUp, () -> {
-            synchronized(commandLock) {
-                if (canSendCommand()) {
-                    x += MOVE_STEP_X;
-                    currentDirection = MovementDirection.UP;
-                    sendArmCommand(1041);
-                    updateLastCommandTime();
-                }
+            if (canSendCommand()) {
+                x += MOVE_STEP_X;
+                currentDirection = MovementDirection.UP;
+                sendCommand(1041);
             }
         });
 
         // Down button (X-)
         setButtonListener(btnDown, () -> {
-            synchronized(commandLock) {
-                if (canSendCommand()) {
-                    x -= MOVE_STEP_X;
-                    currentDirection = MovementDirection.DOWN;
-                    sendArmCommand(1041);
-                    updateLastCommandTime();
-                }
+            if (canSendCommand()) {
+                x -= MOVE_STEP_X;
+                currentDirection = MovementDirection.DOWN;
+                sendCommand(1041);
             }
         });
 
         // Left button (Y+)
         setButtonListener(btnLeft, () -> {
-            synchronized(commandLock) {
-                if (canSendCommand()) {
-                    y += MOVE_STEP_Y;
-                    currentDirection = MovementDirection.LEFT;
-                    sendArmCommand(1041);
-                    updateLastCommandTime();
-                }
+            if (canSendCommand()) {
+                y += MOVE_STEP_Y;
+                currentDirection = MovementDirection.LEFT;
+                sendCommand(1041);
             }
         });
 
         // Right button (Y-)
         setButtonListener(btnRight, () -> {
-            synchronized(commandLock) {
-                if (canSendCommand()) {
-                    y -= MOVE_STEP_Y;
-                    currentDirection = MovementDirection.RIGHT;
-                    sendArmCommand(1041);
-                    updateLastCommandTime();
-                }
+            if (canSendCommand()) {
+                y -= MOVE_STEP_Y;
+                currentDirection = MovementDirection.RIGHT;
+                sendCommand(1041);
             }
         });
 
         // Z Up
         setButtonListener(btnZUp, () -> {
-            synchronized(commandLock) {
-                if (canSendCommand()) {
-                    z += MOVE_STEP_Z;
-                    currentDirection = MovementDirection.Z_UP;
-                    sendArmCommand(1041);
-                    updateLastCommandTime();
-                }
+            if (canSendCommand()) {
+                z += MOVE_STEP_Z;
+                currentDirection = MovementDirection.Z_UP;
+                sendCommand(1041);
             }
         });
 
         // Z Down
         setButtonListener(btnZDown, () -> {
-            synchronized(commandLock) {
-                if (canSendCommand()) {
-                    z -= MOVE_STEP_Z;
-                    currentDirection = MovementDirection.Z_DOWN;
-                    sendArmCommand(1041);
-                    updateLastCommandTime();
-                }
+            if (canSendCommand()) {
+                z -= MOVE_STEP_Z;
+                currentDirection = MovementDirection.Z_DOWN;
+                sendCommand(1041);
             }
         });
 
         // Torque Left
         setButtonListener(btnTorqueLeft, () -> {
-            synchronized(commandLock) {
-                if (canSendCommand()) {
-                    t -= TORQUE_STEP;
-                    currentDirection = MovementDirection.T_LEFT;
-                    sendArmCommand(1041);
-                    updateLastCommandTime();
-                }
+            if (canSendCommand()) {
+                t -= TORQUE_STEP;
+                currentDirection = MovementDirection.T_LEFT;
+                sendCommand(1041);
             }
         });
 
         // Torque Right
         setButtonListener(btnTorqueRight, () -> {
-            synchronized(commandLock) {
-                if (canSendCommand()) {
-                    t += TORQUE_STEP;
-                    currentDirection = MovementDirection.T_RIGHT;
-                    sendArmCommand(1041);
-                    updateLastCommandTime();
-                }
+            if (canSendCommand()) {
+                t += TORQUE_STEP;
+                currentDirection = MovementDirection.T_RIGHT;
+                sendCommand(1041);
             }
         });
 
         // Reset button
         btnReset.setOnClickListener(v -> {
-            synchronized(commandLock) {
-                if (canSendCommand()) {
-                    x = INT_X;
-                    y = INT_Y;
-                    z = INT_Z;
-                    t = INT_T;
-                    currentDirection = MovementDirection.NONE;
-                    sendArmCommand(100);
-                    updateLastCommandTime();
-                }
+            if (canSendCommand()) {
+                x = INT_X;
+                y = INT_Y;
+                z = INT_Z;
+                t = INT_T;
+                currentDirection = MovementDirection.NONE;
+                sendCommand(100);
             }
         });
-    }
-
-    private boolean canSendCommand() {
-        long currentTime = System.currentTimeMillis();
-        return !isCommandInProgress.get() &&
-                (currentTime - lastCommandTime) >= MIN_COMMAND_INTERVAL;
-    }
-
-    private void updateLastCommandTime() {
-        lastCommandTime = System.currentTimeMillis();
     }
 
     private void setButtonListener(Button button, Runnable action) {
         button.setOnTouchListener(new View.OnTouchListener() {
             private boolean isHeld = false;
-            private final Handler handler = new Handler();
+            private final Handler handler = new Handler(Looper.getMainLooper());
 
             private final Runnable repeatAction = new Runnable() {
                 @Override
@@ -252,7 +252,24 @@ public class RobotControlFragment extends Fragment {
         });
     }
 
-    private void sendArmCommand(int cmdType) {
+    private boolean canSendCommand() {
+        long currentTime = System.currentTimeMillis();
+        return !isCommandInProgress.get() &&
+                (currentTime - lastCommandTime) >= MIN_COMMAND_INTERVAL;
+    }
+
+    private void updateLastCommandTime() {
+        lastCommandTime = System.currentTimeMillis();
+    }
+
+    private void sendCommand(int cmdType) {
+        if (canSendCommand()) {
+            commandQueue.offer(new Command(cmdType, x, y, z, t));
+            updateLastCommandTime();
+        }
+    }
+
+    private void processCommand(Command cmd) {
         if (!switchCommMode.isChecked()) {
             showToast(String.format("Wired mode (not implemented). Coords: x=%.2f, y=%.2f, z=%.2f, t=%.2f",
                     x, y, z, t));
@@ -260,72 +277,66 @@ public class RobotControlFragment extends Fragment {
         }
 
         isCommandInProgress.set(true);
-
         String jsonCmd;
-        if (cmdType == 100) {
+        if (cmd.cmdType == 100) {
             jsonCmd = "{\"T\":100}";
-        } else if (cmdType == 1041) {
-            jsonCmd = String.format(
-                    "{\"T\":1041,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f}",
-                    x, y, z, t
-            );
-            Log.d(TAG, String.format("Sending command: x=%.2f, y=%.2f, z=%.2f, t=%.2f", x, y, z, t));
         } else {
-            jsonCmd = String.format("{\"T\":%d}", cmdType);
+            jsonCmd = String.format(
+                    "{\"T\":%d,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f}",
+                    cmd.cmdType, cmd.x, cmd.y, cmd.z, cmd.t
+            );
+            Log.d(TAG, String.format("Sending command: x=%.2f, y=%.2f, z=%.2f, t=%.2f",
+                    cmd.x, cmd.y, cmd.z, cmd.t));
         }
 
-        final String requestUrl = "http://" + robotIp + "/js?json=" + jsonCmd;
+        String requestUrl = "http://" + robotIp + "/js?json=" + jsonCmd;
 
-        new Thread(() -> {
-            HttpURLConnection conn = null;
-            BufferedReader reader = null;
-            try {
-                URL url = new URL(requestUrl);
-                conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-                conn.connect();
+        try {
+            URL url = new URL(requestUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
 
-                int responseCode = conn.getResponseCode();
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                    StringBuilder sb = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        sb.append(line);
-                    }
-                    String response = sb.toString();
-                    Log.d(TAG, "Response: " + response);
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream()))) {
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Error sending command", e);
-                showToast("Error: " + e.getMessage());
-            } finally {
-                try {
-                    if (reader != null) reader.close();
-                    if (conn != null) conn.disconnect();
-                } catch (Exception ignored) {}
-                isCommandInProgress.set(false);
+                Log.d(TAG, "Response: " + response);
             }
-        }).start();
+        } catch (Exception e) {
+            Log.e(TAG, "Error sending command", e);
+            showToast("Error: " + e.getMessage());
+        } finally {
+            isCommandInProgress.set(false);
+        }
     }
 
     private void showToast(String message) {
-        if (getActivity() != null) {
-            getActivity().runOnUiThread(() ->
-                    Toast.makeText(getActivity(), message, Toast.LENGTH_SHORT).show()
-            );
-        }
+        Handler mainHandler = new Handler(Looper.getMainLooper());
+        mainHandler.post(() -> {
+            if (getActivity() != null && !getActivity().isFinishing()) {
+                Toast.makeText(getActivity(), message, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        synchronized(commandLock) {
-            isMoving = false;
-            currentDirection = MovementDirection.NONE;
-            isCommandInProgress.set(false);
+        executorService.shutdownNow();
+        try {
+            if (!executorService.awaitTermination(100, TimeUnit.MILLISECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
         }
+        isMoving = false;
+        currentDirection = MovementDirection.NONE;
+        isCommandInProgress.set(false);
     }
 }
