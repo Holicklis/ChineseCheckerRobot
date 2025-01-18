@@ -251,7 +251,6 @@ public class RobotControlFragment extends Fragment {
             }
         });
     }
-    //ABC
 
     private boolean canSendCommand() {
         long currentTime = System.currentTimeMillis();
