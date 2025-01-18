@@ -3,8 +3,7 @@ package hku.cs.fyp24057.chinesecheckerrobot;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.Matrix;
-import android.graphics.Typeface;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -12,7 +11,6 @@ import android.view.Surface;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,36 +24,30 @@ import androidx.fragment.app.Fragment;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
-import org.opencv.android.Utils;
-import org.opencv.core.Core;
-import org.opencv.core.Mat;
-import org.opencv.core.Size;
-import org.opencv.imgproc.Imgproc;
-
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 public class CameraFragment extends Fragment {
     private static final String TAG = "CameraFragment";
     private PreviewView previewView;
-    private ImageView processedImageView;
-    private TextView boardStateText;
-    private Button captureButton;
+    private Button captureEmptyButton;
+    private Button captureCurrentButton;
+    private TextView resultText;
     private ImageCapture imageCapture;
-    private BoardState currentBoardState;
+    private BoardDetectionClient detectionClient;
+    private boolean hasEmptyBoard = false;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Request permissions at onCreate
         requestRequiredPermissions();
+        detectionClient = new BoardDetectionClient();
     }
 
     private void requestRequiredPermissions() {
         String[] permissions = new String[]{
-                Manifest.permission.CAMERA,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.READ_EXTERNAL_STORAGE
+                Manifest.permission.CAMERA
         };
 
         boolean allGranted = true;
@@ -72,6 +64,25 @@ public class CameraFragment extends Fragment {
         }
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 1001) {
+            boolean allGranted = true;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    break;
+                }
+            }
+            if (allGranted) {
+                startCamera();
+            } else {
+                Toast.makeText(requireContext(), "Camera permission is required", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -83,43 +94,139 @@ public class CameraFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Initialize views
         previewView = view.findViewById(R.id.previewView);
-        processedImageView = view.findViewById(R.id.processedImageView);
-        boardStateText = view.findViewById(R.id.boardStateText);
-        captureButton = view.findViewById(R.id.captureButton);
+        captureEmptyButton = view.findViewById(R.id.captureEmptyButton);
+        captureCurrentButton = view.findViewById(R.id.captureCurrentButton);
+        resultText = view.findViewById(R.id.resultText);
 
-        boardStateText.setTypeface(Typeface.MONOSPACE);
+        setupButtons();
 
-        // Initialize board state
-        currentBoardState = new BoardState();
-
-        // Set up capture button
-        captureButton.setOnClickListener(v -> {
-            captureButton.setEnabled(false); // Prevent multiple clicks
-            captureImage();
-        });
-
-        // Start camera if permissions are granted
         if (allPermissionsGranted()) {
             startCamera();
         }
     }
 
     private boolean allPermissionsGranted() {
-        String[] permissions = new String[]{
-                Manifest.permission.CAMERA,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-        };
+        return ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED;
+    }
 
-        for (String permission : permissions) {
-            if (ContextCompat.checkSelfPermission(requireContext(), permission)
-                    != PackageManager.PERMISSION_GRANTED) {
-                return false;
+    private void setupButtons() {
+        captureEmptyButton.setOnClickListener(v -> {
+            captureEmptyButton.setEnabled(false);
+            takePicture(true);
+        });
+
+        captureCurrentButton.setOnClickListener(v -> {
+            if (!hasEmptyBoard) {
+                Toast.makeText(requireContext(),
+                        "Please capture empty board first",
+                        Toast.LENGTH_SHORT).show();
+                return;
             }
+            captureCurrentButton.setEnabled(false);
+            takePicture(false);
+        });
+
+        // Initially disable current button until empty board is processed
+        captureCurrentButton.setEnabled(false);
+    }
+
+    private void takePicture(boolean isEmptyBoard) {
+        if (imageCapture == null) {
+            Log.e(TAG, "Cannot take picture, imageCapture is null");
+            return;
         }
-        return true;
+
+        imageCapture.takePicture(ContextCompat.getMainExecutor(requireContext()),
+                new ImageCapture.OnImageCapturedCallback() {
+                    @Override
+                    public void onCaptureSuccess(@NonNull ImageProxy image) {
+                        Bitmap bitmap = imageProxyToBitmap(image);
+                        if (bitmap != null) {
+                            processImage(bitmap, isEmptyBoard);
+                        }
+                        image.close();
+                    }
+
+                    @Override
+                    public void onError(@NonNull ImageCaptureException exception) {
+                        Log.e(TAG, "Image capture failed", exception);
+                        Toast.makeText(requireContext(),
+                                "Failed to capture image: " + exception.getMessage(),
+                                Toast.LENGTH_SHORT).show();
+                        captureEmptyButton.setEnabled(true);
+                        captureCurrentButton.setEnabled(hasEmptyBoard);
+                    }
+                });
+    }
+
+    private void processImage(Bitmap bitmap, boolean isEmptyBoard) {
+        if (isEmptyBoard) {
+            detectionClient.uploadEmptyBoard(bitmap, new BoardDetectionClient.DetectionCallback() {
+                @Override
+                public void onSuccess(List<String> boardState) {
+                    requireActivity().runOnUiThread(() -> {
+                        hasEmptyBoard = true;
+                        captureEmptyButton.setEnabled(true);
+                        captureCurrentButton.setEnabled(true);
+                        Toast.makeText(requireContext(),
+                                "Empty board processed successfully",
+                                Toast.LENGTH_SHORT).show();
+                    });
+                }
+
+                @Override
+                public void onError(String error) {
+                    requireActivity().runOnUiThread(() -> {
+                        captureEmptyButton.setEnabled(true);
+                        Toast.makeText(requireContext(),
+                                "Error: " + error, Toast.LENGTH_LONG).show();
+                    });
+                }
+            });
+        } else {
+            detectionClient.detectCurrentState(bitmap, new BoardDetectionClient.DetectionCallback() {
+                @Override
+                public void onSuccess(List<String> boardState) {
+                    requireActivity().runOnUiThread(() -> {
+                        captureCurrentButton.setEnabled(true);
+                        if (boardState != null) {
+                            StringBuilder display = new StringBuilder("Board State:\n\n");
+                            for (String row : boardState) {
+                                display.append(row).append('\n');
+                            }
+                            resultText.setText(display.toString());
+                        }
+                        Toast.makeText(requireContext(),
+                                "Board state detected successfully",
+                                Toast.LENGTH_SHORT).show();
+                    });
+                }
+
+                @Override
+                public void onError(String error) {
+                    requireActivity().runOnUiThread(() -> {
+                        captureCurrentButton.setEnabled(true);
+                        resultText.setText("Error: " + error);
+                        Toast.makeText(requireContext(),
+                                "Error: " + error,
+                                Toast.LENGTH_LONG).show();
+                    });
+                }
+            });
+        }
+    }
+
+    private Bitmap imageProxyToBitmap(ImageProxy image) {
+        ImageProxy.PlaneProxy[] planes = image.getPlanes();
+        if (planes.length > 0) {
+            ByteBuffer buffer = planes[0].getBuffer();
+            byte[] bytes = new byte[buffer.remaining()];
+            buffer.get(bytes);
+            return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+        }
+        return null;
     }
 
     private void startCamera() {
@@ -130,14 +237,18 @@ public class CameraFragment extends Fragment {
             try {
                 ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
 
-                // Set up preview use case
-                Preview preview = new Preview.Builder().build();
+                // Set up the preview use case
+                Preview preview = new Preview.Builder()
+                        .setTargetAspectRatio(AspectRatio.RATIO_4_3)  // Use 4:3 aspect ratio
+                        .build();
+
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
-                // Set up image capture use case with rotation
+                // Configure image capture use case
                 imageCapture = new ImageCapture.Builder()
-                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                        .setTargetRotation(Surface.ROTATION_0) // Set default rotation
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)  // Prioritize quality over speed
+                        .setTargetAspectRatio(AspectRatio.RATIO_4_3)  // Match preview aspect ratio
+                        .setTargetRotation(Surface.ROTATION_0)
                         .build();
 
                 // Select back camera
@@ -145,16 +256,19 @@ public class CameraFragment extends Fragment {
                         .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                         .build();
 
-                // Unbind any bound use cases before rebinding
+                // Unbind existing use cases before rebinding
                 cameraProvider.unbindAll();
 
                 // Bind use cases to camera
-                cameraProvider.bindToLifecycle(
+                Camera camera = cameraProvider.bindToLifecycle(
                         getViewLifecycleOwner(),
                         cameraSelector,
                         preview,
                         imageCapture
                 );
+
+                // Set up zoom if needed
+                camera.getCameraControl().setLinearZoom(0.0f);  // Start with no zoom
 
                 Log.d(TAG, "Camera started successfully");
 
@@ -164,108 +278,6 @@ public class CameraFragment extends Fragment {
                 Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
             }
         }, ContextCompat.getMainExecutor(requireContext()));
-    }
-
-    private void captureImage() {
-        if (imageCapture == null) {
-            Log.e(TAG, "imageCapture is null");
-            Toast.makeText(requireContext(), "Camera not initialized", Toast.LENGTH_SHORT).show();
-            captureButton.setEnabled(true);
-            return;
-        }
-
-        Log.d(TAG, "Capturing image...");
-
-        // Take picture
-        imageCapture.takePicture(
-                ContextCompat.getMainExecutor(requireContext()),
-                new ImageCapture.OnImageCapturedCallback() {
-                    @Override
-                    public void onCaptureSuccess(@NonNull ImageProxy image) {
-                        Log.d(TAG, "Image captured successfully, processing...");
-                        processImage(image);
-                        image.close();
-                        captureButton.setEnabled(true);
-                    }
-
-                    @Override
-                    public void onError(@NonNull ImageCaptureException exception) {
-                        String msg = "Error capturing image: " + exception.getMessage();
-                        Log.e(TAG, msg, exception);
-                        Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
-                        captureButton.setEnabled(true);
-                    }
-                });
-    }
-
-    private void processImage(ImageProxy image) {
-        try {
-            Log.d(TAG, "Starting image processing");
-
-            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-            byte[] bytes = new byte[buffer.remaining()];
-            buffer.get(bytes);
-
-            // Convert image to bitmap
-            Bitmap bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-            if (bitmap == null) {
-                Log.e(TAG, "Failed to decode bitmap");
-                return;
-            }
-
-            // Rotate bitmap if needed
-            Matrix matrix = new Matrix();
-            matrix.postRotate(90); // Rotate 90 degrees clockwise
-            Bitmap rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0,
-                    bitmap.getWidth(), bitmap.getHeight(), matrix, true);
-
-            // Convert to OpenCV Mat
-            Mat mat = new Mat();
-            Utils.bitmapToMat(rotatedBitmap, mat);
-
-            Log.d(TAG, "Starting board processing");
-            currentBoardState = BoardImageProcessor.processImage(mat, requireContext());
-            Log.d(TAG, "Board processing completed");
-
-            // Convert processed Mat back to Bitmap for display
-            Bitmap processedBitmap = Bitmap.createBitmap(
-                    mat.cols(), mat.rows(), Bitmap.Config.ARGB_8888);
-            Utils.matToBitmap(mat, processedBitmap);
-
-            // Update UI
-            requireActivity().runOnUiThread(() -> {
-                processedImageView.setImageBitmap(processedBitmap);
-                processedImageView.setVisibility(View.VISIBLE);
-                previewView.setVisibility(View.GONE);
-                boardStateText.setText(currentBoardState.toString());
-                Log.d(TAG, "UI updated with processed image");
-            });
-
-            // Cleanup
-            mat.release();
-            Log.d(TAG, "Image processing completed successfully");
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error processing image: " + e.getMessage(), e);
-            Toast.makeText(requireContext(), "Error processing image: " + e.getMessage(),
-                    Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        if (requestCode == 1001) {
-            if (allPermissionsGranted()) {
-                Log.d(TAG, "All permissions granted, starting camera");
-                startCamera();
-            } else {
-                Log.e(TAG, "Permissions not granted");
-                Toast.makeText(requireContext(),
-                        "Permissions are required for camera and storage",
-                        Toast.LENGTH_LONG).show();
-            }
-        }
     }
 
     @Override
