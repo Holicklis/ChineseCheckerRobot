@@ -1,0 +1,2240 @@
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
+Colour: green
+Center: (335, 311)
+Colour: green
+Center: (398, 309)
+Colour: green
+Center: (461, 308)
+Colour: green
+Center: (524, 307)
+Colour: green
+Center: (366, 256)
+Colour: green
+Center: (493, 254)
+Colour: green
+Center: (428, 255)
+Colour: green
+Center: (460, 199)
+Colour: green
+Center: (397, 201)
+Colour: green
+Center: (427, 146)
+Colour: red
+Center: (434, 1023)
+Colour: red
+Center: (465, 968)
+Colour: red
+Center: (402, 967)
+Colour: red
+Center: (370, 912)
+Colour: red
+Center: (434, 910)
+Colour: red
+Center: (499, 910)
+Colour: red
+Center: (340, 856)
+Colour: red
+Center: (466, 855)
+Colour: red
+Center: (402, 855)
+Colour: red
+Center: (529, 854)
