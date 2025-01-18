@@ -4,7 +4,30 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:gravity="center">
+    android:gravity="center"
+    android:padding="16dp">
+
+    <!-- IP Configuration Section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="16dp">
+
+        <EditText
+            android:id="@+id/editTextIpAddress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Robot IP Address"
+            android:inputType="text"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btnConnect"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Connect"/>
+    </LinearLayout>
 
     <!-- Switch: placeholder for wifi ap or not -->
     <Switch
@@ -15,7 +38,7 @@
         android:checked="true"
         android:layout_margin="16dp" />
 
-    <!-- XY  -->
+    <!-- XY Controls -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -54,7 +77,7 @@
             android:text="→" />
     </LinearLayout>
 
-    <!-- Z  -->
+    <!-- Z Controls -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -75,7 +98,7 @@
             android:text="Z ↓" />
     </LinearLayout>
 
-    <!-- Torque -->
+    <!-- Torque Controls -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -95,11 +118,13 @@
             android:layout_height="wrap_content"
             android:text="Torque →" />
     </LinearLayout>
+
+    <!-- Reset Button -->
     <Button
         android:id="@+id/btnReset"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
         android:text="Reset" />
-
 
 </LinearLayout>

@@ -1,5 +1,7 @@
 package hku.cs.fyp24057.chinesecheckerrobot;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -8,6 +10,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Switch;
 import android.widget.Toast;
 import android.util.Log;
@@ -29,9 +32,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class RobotControlFragment extends Fragment {
     private static final String TAG = "RobotControlFragment";
+    private static final String PREFS_NAME = "RobotSettings";
+    private static final String PREF_ROBOT_IP = "robot_ip";
 
     // UI Elements
     private Switch switchCommMode;
+    private EditText editTextIpAddress;
+    private Button btnConnect;
     private Button btnUp, btnDown, btnLeft, btnRight;
     private Button btnZUp, btnZDown;
     private Button btnTorqueLeft, btnTorqueRight;
@@ -42,7 +49,7 @@ public class RobotControlFragment extends Fragment {
     private final BlockingQueue<Command> commandQueue = new LinkedBlockingQueue<>();
     private final AtomicBoolean isCommandInProgress = new AtomicBoolean(false);
     private long lastCommandTime = 0;
-    private static final long MIN_COMMAND_INTERVAL = 20; // Minimum time between commands in ms
+    private static final long MIN_COMMAND_INTERVAL = 20;
 
     // Movement state tracking
     private boolean isMoving = false;
@@ -76,10 +83,11 @@ public class RobotControlFragment extends Fragment {
     private float x = INT_X;
     private float y = INT_Y;
     private float z = INT_Z;
-    private float t = INT_T;  // wrist angle
+    private float t = INT_T;
 
     // Robot configuration
-    private String robotIp = "192.168.4.1";
+    private String robotIp;
+    private boolean isConnected = false;
 
     // Movement increments
     private final float MOVE_STEP_X = 5.0f;
@@ -97,11 +105,13 @@ public class RobotControlFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         initializeViews(view);
+        loadRobotIp();
         setupButtonListeners();
         startCommandProcessor();
     }
 
     private void initializeViews(View view) {
+        // Original views
         switchCommMode = view.findViewById(R.id.switchCommMode);
         btnUp = view.findViewById(R.id.btnUp);
         btnDown = view.findViewById(R.id.btnDown);
@@ -112,6 +122,97 @@ public class RobotControlFragment extends Fragment {
         btnTorqueLeft = view.findViewById(R.id.btnTorqueLeft);
         btnTorqueRight = view.findViewById(R.id.btnTorqueRight);
         btnReset = view.findViewById(R.id.btnReset);
+
+        // New views for IP configuration
+        editTextIpAddress = view.findViewById(R.id.editTextIpAddress);
+        btnConnect = view.findViewById(R.id.btnConnect);
+
+        // Set up the connect button
+        btnConnect.setOnClickListener(v -> {
+            String newIp = editTextIpAddress.getText().toString().trim();
+            if (isValidIpAddress(newIp)) {
+                saveRobotIp(newIp);
+                testConnection();
+            } else {
+                showToast("Invalid IP address format");
+            }
+        });
+
+        // Initially disable control buttons
+        setControlButtonsEnabled(false);
+    }
+
+    private void loadRobotIp() {
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        robotIp = prefs.getString(PREF_ROBOT_IP, "192.168.1.100"); // Default IP for router mode
+        editTextIpAddress.setText(robotIp);
+    }
+
+    private void saveRobotIp(String ip) {
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putString(PREF_ROBOT_IP, ip).apply();
+        robotIp = ip;
+    }
+
+    private boolean isValidIpAddress(String ip) {
+        String[] parts = ip.split("\\.");
+        if (parts.length != 4) return false;
+
+        try {
+            for (String part : parts) {
+                int value = Integer.parseInt(part);
+                if (value < 0 || value > 255) return false;
+            }
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private void testConnection() {
+        executorService.submit(() -> {
+            try {
+                String testUrl = "http://" + robotIp + "/js?json={\"T\":0}";  // Simple test command
+                URL url = new URL(testUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+
+                int responseCode = conn.getResponseCode();
+                isConnected = (responseCode == HttpURLConnection.HTTP_OK);
+
+                requireActivity().runOnUiThread(() -> {
+                    if (isConnected) {
+                        showToast("Connected to robot successfully");
+                        setControlButtonsEnabled(true);
+                    } else {
+                        showToast("Failed to connect to robot");
+                        setControlButtonsEnabled(false);
+                    }
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Connection test failed", e);
+                requireActivity().runOnUiThread(() -> {
+                    showToast("Connection failed: " + e.getMessage());
+                    setControlButtonsEnabled(false);
+                    isConnected = false;
+                });
+            }
+        });
+    }
+
+    private void setControlButtonsEnabled(boolean enabled) {
+        btnUp.setEnabled(enabled);
+        btnDown.setEnabled(enabled);
+        btnLeft.setEnabled(enabled);
+        btnRight.setEnabled(enabled);
+        btnZUp.setEnabled(enabled);
+        btnZDown.setEnabled(enabled);
+        btnTorqueLeft.setEnabled(enabled);
+        btnTorqueRight.setEnabled(enabled);
+        btnReset.setEnabled(enabled);
     }
 
     private void startCommandProcessor() {
@@ -119,7 +220,7 @@ public class RobotControlFragment extends Fragment {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     Command cmd = commandQueue.poll(100, TimeUnit.MILLISECONDS);
-                    if (cmd != null) {
+                    if (cmd != null && isConnected) {
                         processCommand(cmd);
                     }
                 } catch (InterruptedException e) {
@@ -224,7 +325,7 @@ public class RobotControlFragment extends Fragment {
             private final Runnable repeatAction = new Runnable() {
                 @Override
                 public void run() {
-                    if (isHeld) {
+                    if (isHeld && isConnected) {
                         action.run();
                         handler.postDelayed(this, MIN_COMMAND_INTERVAL);
                     }
@@ -253,6 +354,10 @@ public class RobotControlFragment extends Fragment {
     }
 
     private boolean canSendCommand() {
+        if (!isConnected) {
+            showToast("Not connected to robot");
+            return false;
+        }
         long currentTime = System.currentTimeMillis();
         return !isCommandInProgress.get() &&
                 (currentTime - lastCommandTime) >= MIN_COMMAND_INTERVAL;
