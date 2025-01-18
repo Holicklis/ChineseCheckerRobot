@@ -1,1 +1,2 @@
-Board contour area: 557155.5
+Board contour area: 528954.5
+Board contour area: 526732.5

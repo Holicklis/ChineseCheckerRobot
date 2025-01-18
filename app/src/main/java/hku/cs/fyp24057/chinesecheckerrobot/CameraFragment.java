@@ -2,6 +2,8 @@ package hku.cs.fyp24057.chinesecheckerrobot;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -9,6 +11,7 @@ import android.view.Surface;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -21,18 +24,25 @@ import androidx.fragment.app.Fragment;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 public class CameraFragment extends Fragment {
     private static final String TAG = "CameraFragment";
     private PreviewView previewView;
-    private Button captureButton;
+    private Button captureEmptyButton;
+    private Button captureCurrentButton;
+    private TextView resultText;
     private ImageCapture imageCapture;
+    private BoardDetectionClient detectionClient;
+    private boolean hasEmptyBoard = false;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestRequiredPermissions();
+        detectionClient = new BoardDetectionClient();
     }
 
     private void requestRequiredPermissions() {
@@ -54,6 +64,25 @@ public class CameraFragment extends Fragment {
         }
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 1001) {
+            boolean allGranted = true;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    break;
+                }
+            }
+            if (allGranted) {
+                startCamera();
+            } else {
+                Toast.makeText(requireContext(), "Camera permission is required", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
@@ -65,18 +94,13 @@ public class CameraFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Initialize views
         previewView = view.findViewById(R.id.previewView);
-        captureButton = view.findViewById(R.id.captureButton);
+        captureEmptyButton = view.findViewById(R.id.captureEmptyButton);
+        captureCurrentButton = view.findViewById(R.id.captureCurrentButton);
+        resultText = view.findViewById(R.id.resultText);
 
-        // Set up capture button
-        captureButton.setOnClickListener(v -> {
-            captureButton.setEnabled(false);
-            Toast.makeText(requireContext(), "Image captured!", Toast.LENGTH_SHORT).show();
-            captureButton.setEnabled(true);
-        });
+        setupButtons();
 
-        // Start camera if permissions are granted
         if (allPermissionsGranted()) {
             startCamera();
         }
@@ -87,6 +111,124 @@ public class CameraFragment extends Fragment {
                 == PackageManager.PERMISSION_GRANTED;
     }
 
+    private void setupButtons() {
+        captureEmptyButton.setOnClickListener(v -> {
+            captureEmptyButton.setEnabled(false);
+            takePicture(true);
+        });
+
+        captureCurrentButton.setOnClickListener(v -> {
+            if (!hasEmptyBoard) {
+                Toast.makeText(requireContext(),
+                        "Please capture empty board first",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+            captureCurrentButton.setEnabled(false);
+            takePicture(false);
+        });
+
+        // Initially disable current button until empty board is processed
+        captureCurrentButton.setEnabled(false);
+    }
+
+    private void takePicture(boolean isEmptyBoard) {
+        if (imageCapture == null) {
+            Log.e(TAG, "Cannot take picture, imageCapture is null");
+            return;
+        }
+
+        imageCapture.takePicture(ContextCompat.getMainExecutor(requireContext()),
+                new ImageCapture.OnImageCapturedCallback() {
+                    @Override
+                    public void onCaptureSuccess(@NonNull ImageProxy image) {
+                        Bitmap bitmap = imageProxyToBitmap(image);
+                        if (bitmap != null) {
+                            processImage(bitmap, isEmptyBoard);
+                        }
+                        image.close();
+                    }
+
+                    @Override
+                    public void onError(@NonNull ImageCaptureException exception) {
+                        Log.e(TAG, "Image capture failed", exception);
+                        Toast.makeText(requireContext(),
+                                "Failed to capture image: " + exception.getMessage(),
+                                Toast.LENGTH_SHORT).show();
+                        captureEmptyButton.setEnabled(true);
+                        captureCurrentButton.setEnabled(hasEmptyBoard);
+                    }
+                });
+    }
+
+    private void processImage(Bitmap bitmap, boolean isEmptyBoard) {
+        if (isEmptyBoard) {
+            detectionClient.uploadEmptyBoard(bitmap, new BoardDetectionClient.DetectionCallback() {
+                @Override
+                public void onSuccess(List<String> boardState) {
+                    requireActivity().runOnUiThread(() -> {
+                        hasEmptyBoard = true;
+                        captureEmptyButton.setEnabled(true);
+                        captureCurrentButton.setEnabled(true);
+                        Toast.makeText(requireContext(),
+                                "Empty board processed successfully",
+                                Toast.LENGTH_SHORT).show();
+                    });
+                }
+
+                @Override
+                public void onError(String error) {
+                    requireActivity().runOnUiThread(() -> {
+                        captureEmptyButton.setEnabled(true);
+                        Toast.makeText(requireContext(),
+                                "Error: " + error, Toast.LENGTH_LONG).show();
+                    });
+                }
+            });
+        } else {
+            detectionClient.detectCurrentState(bitmap, new BoardDetectionClient.DetectionCallback() {
+                @Override
+                public void onSuccess(List<String> boardState) {
+                    requireActivity().runOnUiThread(() -> {
+                        captureCurrentButton.setEnabled(true);
+                        if (boardState != null) {
+                            StringBuilder display = new StringBuilder("Board State:\n\n");
+                            for (String row : boardState) {
+                                display.append(row).append('\n');
+                            }
+                            resultText.setText(display.toString());
+                        }
+                        Toast.makeText(requireContext(),
+                                "Board state detected successfully",
+                                Toast.LENGTH_SHORT).show();
+                    });
+                }
+
+                @Override
+                public void onError(String error) {
+                    requireActivity().runOnUiThread(() -> {
+                        captureCurrentButton.setEnabled(true);
+                        resultText.setText("Error: " + error);
+                        Toast.makeText(requireContext(),
+                                "Error: " + error,
+                                Toast.LENGTH_LONG).show();
+                    });
+                }
+            });
+        }
+    }
+
+    private Bitmap imageProxyToBitmap(ImageProxy image) {
+        ImageProxy.PlaneProxy[] planes = image.getPlanes();
+        if (planes.length > 0) {
+            ByteBuffer buffer = planes[0].getBuffer();
+            byte[] bytes = new byte[buffer.remaining()];
+            buffer.get(bytes);
+            return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+        }
+        return null;
+    }
+
     private void startCamera() {
         ListenableFuture<ProcessCameraProvider> cameraProviderFuture =
                 ProcessCameraProvider.getInstance(requireContext());
@@ -95,25 +237,38 @@ public class CameraFragment extends Fragment {
             try {
                 ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
 
-                Preview preview = new Preview.Builder().build();
+                // Set up the preview use case
+                Preview preview = new Preview.Builder()
+                        .setTargetAspectRatio(AspectRatio.RATIO_4_3)  // Use 4:3 aspect ratio
+                        .build();
+
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
+                // Configure image capture use case
                 imageCapture = new ImageCapture.Builder()
-                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)  // Prioritize quality over speed
+                        .setTargetAspectRatio(AspectRatio.RATIO_4_3)  // Match preview aspect ratio
                         .setTargetRotation(Surface.ROTATION_0)
                         .build();
 
+                // Select back camera
                 CameraSelector cameraSelector = new CameraSelector.Builder()
                         .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                         .build();
 
+                // Unbind existing use cases before rebinding
                 cameraProvider.unbindAll();
-                cameraProvider.bindToLifecycle(
+
+                // Bind use cases to camera
+                Camera camera = cameraProvider.bindToLifecycle(
                         getViewLifecycleOwner(),
                         cameraSelector,
                         preview,
                         imageCapture
                 );
+
+                // Set up zoom if needed
+                camera.getCameraControl().setLinearZoom(0.0f);  // Start with no zoom
 
                 Log.d(TAG, "Camera started successfully");
 
@@ -123,22 +278,6 @@ public class CameraFragment extends Fragment {
                 Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
             }
         }, ContextCompat.getMainExecutor(requireContext()));
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        if (requestCode == 1001) {
-            if (allPermissionsGranted()) {
-                Log.d(TAG, "All permissions granted, starting camera");
-                startCamera();
-            } else {
-                Log.e(TAG, "Permissions not granted");
-                Toast.makeText(requireContext(),
-                        "Camera permission is required",
-                        Toast.LENGTH_LONG).show();
-            }
-        }
     }
 
     @Override
