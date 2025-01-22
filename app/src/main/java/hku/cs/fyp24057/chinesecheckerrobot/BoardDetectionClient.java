@@ -21,17 +21,31 @@ import okhttp3.Response;
 
 public class BoardDetectionClient {
     private static final String TAG = "BoardDetectionClient";
-    private static final String SERVER_URL ="http://192.168.11.230:5001"; // Change to your Mac's IP
+    private static final int DEFAULT_PORT = 5001;
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
     private final OkHttpClient client;
+    private final String serverUrl;
 
-    public BoardDetectionClient() {
-        client = new OkHttpClient.Builder()
+    public BoardDetectionClient(String serverIp) {
+        this(serverIp, DEFAULT_PORT);
+    }
+
+    public BoardDetectionClient(String serverIp, int port) {
+        // Remove any whitespace and trailing slashes from the IP
+        serverIp = serverIp.trim().replaceAll("/+$", "");
+
+        // Format the base URL
+        this.serverUrl = String.format("http://%s:%d", serverIp, port);
+
+        // Initialize OkHttpClient with timeouts
+        this.client = new OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .build();
+
+        Log.d(TAG, "Initialized with server URL: " + serverUrl);
     }
 
     public interface DetectionCallback {
@@ -55,7 +69,7 @@ public class BoardDetectionClient {
                 json.put("image", base64Image);
 
                 Request request = new Request.Builder()
-                        .url(SERVER_URL + "/upload_empty_board")
+                        .url(serverUrl + "/upload_empty_board")
                         .post(RequestBody.create(json.toString(), JSON))
                         .build();
 
@@ -90,7 +104,7 @@ public class BoardDetectionClient {
                 json.put("image", base64Image);
 
                 Request request = new Request.Builder()
-                        .url(SERVER_URL + "/detect_current_state")
+                        .url(serverUrl + "/detect_current_state")
                         .post(RequestBody.create(json.toString(), JSON))
                         .build();
 

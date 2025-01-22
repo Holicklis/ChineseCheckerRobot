@@ -7,13 +7,23 @@
     android:gravity="center">
 
     <!-- Switch: placeholder for wifi ap or not -->
-    <Switch
-        android:id="@+id/switchCommMode"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Use Wi-Fi"
-        android:checked="true"
-        android:layout_margin="16dp" />
+
+
+        <Button
+            android:id="@+id/btnConfigureIp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="16dp"
+            android:layout_gravity="center"
+            android:text="Configure IP" />
+
+        <!--        <Switch-->
+<!--            android:id="@+id/switchCommMode"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:text="Use Wi-Fi"-->
+<!--            android:checked="true" />-->
+
 
     <!-- XY  -->
     <LinearLayout

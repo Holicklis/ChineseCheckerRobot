@@ -33,16 +33,19 @@ public class CameraFragment extends Fragment {
     private PreviewView previewView;
     private Button captureEmptyButton;
     private Button captureCurrentButton;
+    private Button btnConfigureIp;
     private TextView resultText;
     private ImageCapture imageCapture;
     private BoardDetectionClient detectionClient;
     private boolean hasEmptyBoard = false;
 
+    private String serverIp = "192.168.11.230";//default
+
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestRequiredPermissions();
-        detectionClient = new BoardDetectionClient();
+        detectionClient = new BoardDetectionClient(serverIp);
     }
 
     private void requestRequiredPermissions() {
@@ -97,6 +100,7 @@ public class CameraFragment extends Fragment {
         previewView = view.findViewById(R.id.previewView);
         captureEmptyButton = view.findViewById(R.id.captureEmptyButton);
         captureCurrentButton = view.findViewById(R.id.captureCurrentButton);
+        btnConfigureIp = view.findViewById(R.id.btnConfigureIp);
         resultText = view.findViewById(R.id.resultText);
 
         setupButtons();
@@ -127,9 +131,24 @@ public class CameraFragment extends Fragment {
             captureCurrentButton.setEnabled(false);
             takePicture(false);
         });
-
+        btnConfigureIp.setOnClickListener(v -> showIpConfigDialog());
         // Initially disable current button until empty board is processed
         captureCurrentButton.setEnabled(false);
+    }
+
+    private void showIpConfigDialog() {
+        new IpConfigDialog(
+                requireContext(),
+                serverIp,
+                "Configure Server IP",
+                newIp -> {
+                    serverIp = newIp;
+                    detectionClient = new BoardDetectionClient(serverIp);
+                    Toast.makeText(requireContext(),
+                            "Server IP updated to: " + newIp,
+                            Toast.LENGTH_SHORT).show();
+                }
+        ).show();
     }
 
     private void takePicture(boolean isEmptyBoard) {

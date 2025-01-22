@@ -30,13 +30,14 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class RobotControlFragment extends Fragment {
     private static final String TAG = "RobotControlFragment";
-    private static final String ROBOT_IP = "192.168.11.172";
+    private static String ROBOT_IP = "192.168.4.1";
     private static final int COMMAND_QUEUE_SIZE = 10;
     private static final int COMMAND_INTERVAL_MS = 20;
     private static final int HTTP_TIMEOUT_MS = 1000;
 
     // UI Elements
-    private Switch switchCommMode;
+//    private Switch switchCommMode;
+    private Button btnConfigureIp;
     private Button btnUp, btnDown, btnLeft, btnRight;
     private Button btnZUp, btnZDown;
     private Button btnTorqueLeft, btnTorqueRight;
@@ -87,7 +88,8 @@ public class RobotControlFragment extends Fragment {
     }
 
     private void initializeViews(View view) {
-        switchCommMode = view.findViewById(R.id.switchCommMode);
+//        switchCommMode = view.findViewById(R.id.switchCommMode);
+        btnConfigureIp = view.findViewById(R.id.btnConfigureIp);
         btnUp = view.findViewById(R.id.btnUp);
         btnDown = view.findViewById(R.id.btnDown);
         btnLeft = view.findViewById(R.id.btnLeft);
@@ -97,6 +99,22 @@ public class RobotControlFragment extends Fragment {
         btnTorqueLeft = view.findViewById(R.id.btnTorqueLeft);
         btnTorqueRight = view.findViewById(R.id.btnTorqueRight);
         btnReset = view.findViewById(R.id.btnReset);
+
+        btnConfigureIp.setOnClickListener(v -> showIpConfigDialog());
+    }
+
+    private void showIpConfigDialog() {
+        new IpConfigDialog(
+                requireContext(),
+                ROBOT_IP,
+                "Configure Robot IP",
+                newIp -> {
+                    ROBOT_IP = newIp;
+                    Toast.makeText(requireContext(),
+                            "Robot IP updated to: " + newIp,
+                            Toast.LENGTH_SHORT).show();
+                }
+        ).show();
     }
 
     private void startCommandProcessor() {
@@ -193,10 +211,10 @@ public class RobotControlFragment extends Fragment {
     }
 
     private void processCommand(Command cmd) {
-        if (!switchCommMode.isChecked()) {
-            Log.d(TAG, "Wired mode not implemented");
-            return;
-        }
+//        if (!switchCommMode.isChecked()) {
+//            Log.d(TAG, "Wired mode not implemented");
+//            return;
+//        }
 
         isProcessing.set(true);
         try {

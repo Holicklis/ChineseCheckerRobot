@@ -15,10 +15,14 @@ def automatic_brightness_and_contrast(image, clip_hist_percent=1):
     Automatically adjust brightness and contrast using histogram clipping.
     """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # cv2.imshow("Gray Image", gray)
 
     # Calculate grayscale histogram
     hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
     cum_hist = hist.cumsum()
+    
+
 
     # Calculate thresholds
     total = cum_hist[-1]
@@ -43,9 +47,10 @@ def automatic_brightness_and_contrast(image, clip_hist_percent=1):
     beta = -minimum_gray * alpha
 
     auto_result = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
+    # cv2.imshow("Auto Brightness/Contrast", auto_result)
     return auto_result
 
-def preprocess_image(image, max_dim=1600, debug=False):
+def preprocess_image(image, max_dim=1600, debug=False): #1600 unit: pixel
     """
     Preprocess the provided image data with:
       - Adaptive resizing (max dimension = max_dim)
@@ -62,6 +67,8 @@ def preprocess_image(image, max_dim=1600, debug=False):
     """
     if image is None:
         raise ValueError("Invalid image data provided")
+    
+    # cv2.imshow("Original Image", image)
 
     # Resize if larger than max_dim
     height, width = image.shape[:2]
@@ -84,11 +91,15 @@ def preprocess_image(image, max_dim=1600, debug=False):
     enhanced = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
     
     # Blur
+    if debug:
+        cv2.imshow("Enhanced Image", enhanced)
     blurred = cv2.GaussianBlur(enhanced, (5, 5), 0)
+    if debug:
+        cv2.imshow("Blurred Image", blurred)
     hsv_blurred = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
 
-    # if debug:
-    #     cv2.imshow("Preprocessed Image", blurred)
+    if debug:
+        cv2.imshow("Preprocessed Image", blurred)
 
     return blurred, hsv_blurred
 
@@ -106,7 +117,7 @@ RED_LOWER2 = np.array([160, 100, 100])
 RED_UPPER2 = np.array([180, 255, 255])
 
 # Predefined Hough Circle Detection Parameters for Cells
-HOUGH_DP = 1.1
+HOUGH_DP = 1.1        # Inverse ratio of accumulator resolution
 HOUGH_MIN_DIST = 30
 HOUGH_PARAM1=500      # Canny high threshold, decrease will detect more edges
 HOUGH_PARAM2 = 10   # Accumulator threshold, decrease will detect more circles
@@ -119,7 +130,7 @@ MARBLE_HOUGH_MIN_DIST = 30
 MARBLE_HOUGH_PARAM1 = 50   # Canny high threshold
 MARBLE_HOUGH_PARAM2 = 15   # Accumulator threshold
 MARBLE_HOUGH_MIN_RADIUS = 10
-MARBLE_HOUGH_MAX_RADIUS = 60
+MARBLE_HOUGH_MAX_RADIUS = 30
 
 # Base threshold for marble to cell assignment
 BASE_THRESHOLD = 45
@@ -127,10 +138,12 @@ BASE_THRESHOLD = 45
 # ---------------------------
 # Board Detection (Hexagon) - OPTIONAL
 # ---------------------------
-def detect_board(resized_image):
+def detect_board(resized_image, debug=False):
     """
     Attempt to detect the hexagonal outline of the board using contour detection.
     """
+    
+    #increase brightness
     gray = cv2.cvtColor(resized_image, cv2.COLOR_BGR2GRAY)
     
     # Apply Gaussian blur
@@ -138,17 +151,24 @@ def detect_board(resized_image):
     
     # Adaptive Thresholding
     thresholded = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    
+    cv2.imwrite('debug_images/thresholded.jpg', thresholded)
 
     # Canny Edge Detection
     edges = cv2.Canny(blurred, 50, 150)
     
     # cv2.imshow("Thresholded", thresholded)
-    # cv2.imshow("Edges", edges)
+    if debug:
+        cv2.imshow("Edges", edges)
 
     # Morphological Closing to close gaps
     kernel = np.ones((7, 7), np.uint8)
     closed_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
-    # cv2.imshow("Closed Edges", closed_edges)
+    
+    cv2.imwrite('debug_images/Edges.jpg', edges)
+    if debug:
+        cv2.imshow("Closed Edges", closed_edges)
+    cv2.imwrite('debug_images/closed.jpg', closed_edges)
 
     combined_edges = cv2.bitwise_and(thresholded, edges)
     # cv2.imshow("Combined Edges", combined_edges)
@@ -165,7 +185,7 @@ def detect_board(resized_image):
     max_area = 0
     for contour in contours:
         area = cv2.contourArea(contour)
-        min_contour_area = resized_image.shape[0] * resized_image.shape[1] * 0.01
+        min_contour_area = resized_image.shape[0] * resized_image.shape[1] * 0.05
         if area < min_contour_area:
             continue
 
@@ -180,7 +200,8 @@ def detect_board(resized_image):
     if board_contour is not None:
         logging.info(f"Board contour area: {max_area}")
         cv2.drawContours(resized_image, [board_contour], -1, (0, 255, 0), 2)
-        # cv2.imshow("Detected Board", resized_image)
+        if debug:
+            cv2.imshow("Detected Board", resized_image)
         logging.info("Hexagonal board contour found.")
         
         with open('debug_info_board.txt', 'a') as f:
@@ -203,11 +224,18 @@ def detect_board_cells(empty_board_image, board_contour, debug=False):
     Returns:
         List of (x, y) circle centers within the board.
     """
-    gray = cv2.cvtColor(empty_board_image, cv2.COLOR_BGR2GRAY)
-    gray = cv2.medianBlur(gray, 5)
+    if debug:
+        cv2.imshow("Empty Board", empty_board_image)
+        
     
-    gray = cv2.convertScaleAbs(gray, alpha=1.5, beta=0)
-
+    gray = cv2.cvtColor(empty_board_image, cv2.COLOR_BGR2GRAY)
+    
+    gray = cv2.medianBlur(gray, 5)
+    if debug:
+        cv2.imshow("Gray before extra bright", gray)
+    gray = cv2.convertScaleAbs(gray, alpha=1.2, beta=0)
+    if debug:
+        cv2.imshow("Gray for Hough", gray)
     # Perform Hough Circle detection for cells
     circles = cv2.HoughCircles(
         gray,
@@ -237,7 +265,7 @@ def detect_board_cells(empty_board_image, board_contour, debug=False):
                 cv2.circle(empty_board_image, (x, y), 2, (0, 0, 255), 3)
 
     if debug:
-        # cv2.imshow("Detected Board Cells (Filtered)", empty_board_image)
+        cv2.imshow("Detected Board Cells (Filtered)", empty_board_image)
         logging.info(f"[DEBUG] Detected {len(cells)} cells within the board.")
 
     return cells
@@ -443,7 +471,7 @@ def detect_and_draw_circles(mask, image, color_name, board_contour):
                     f.write(f"Center: ({x_int}, {y_int})\n")
     return detected_marbles
 
-def detect_marbles(hsv_image, draw_image, board_contour):
+def detect_marbles(hsv_image, draw_image, board_contour, debug = False):
     """
     Using predefined HSV thresholds for green/red,
     detect marbles and return a combined list of them.
@@ -467,8 +495,9 @@ def detect_marbles(hsv_image, draw_image, board_contour):
     red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
     
     # FOR DEBUG: Show these masks
-    # cv2.imshow("Green Mask", green_mask)
-    # cv2.imshow("Red Mask", red_mask)    
+    if debug:
+        cv2.imshow("Green Mask", green_mask)
+        cv2.imshow("Red Mask", red_mask)    
     
     # Detect circles
     green_marbles = detect_and_draw_circles(green_mask, draw_image, "green", board_contour)
@@ -550,7 +579,7 @@ def main():
         # cv2.imshow("Empty Board", empty_blurred)
 
         # Detect the hexagonal board contour
-        board_contour = detect_board(empty_blurred)
+        board_contour = detect_board(empty_blurred, debug=True)
 
         if board_contour is None:
             logging.error("Board contour not detected. Exiting.")
@@ -577,7 +606,7 @@ def main():
 
         while True:
             temp_display = current_blurred.copy()
-            all_marbles = detect_marbles(current_hsv, temp_display, board_contour)
+            all_marbles = detect_marbles(current_hsv, temp_display, board_contour, debug=True)
             cell_occupancy = assign_marbles_to_cells(empty_cells, all_marbles, base_threshold=BASE_THRESHOLD, debug=True)
 
             # Output debug information
@@ -595,7 +624,7 @@ def main():
                 cv2.circle(temp_display, (int(cx), int(cy)), 5, color_draw, -1)
 
             print_text_board(populated_layout, cell_occupancy)
-            # cv2.imshow("Final Board State", temp_display)
+            cv2.imshow("Final Board State", temp_display)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
