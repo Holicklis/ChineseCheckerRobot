@@ -23,6 +23,9 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.navigation_camera) {
                 selectedFragment = new CameraFragment();
             }
+            else if (itemId == R.id.navigation_board) {
+                selectedFragment = new BoardFragment();
+            }
 
             if (selectedFragment != null) {
                 getSupportFragmentManager().beginTransaction()
