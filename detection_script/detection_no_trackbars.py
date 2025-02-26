@@ -174,7 +174,7 @@ def detect_board(resized_image, debug=False):
     # cv2.imshow("Combined Edges", combined_edges)
 
     # Find Contours
-    contours, _ = cv2.findContours(closed_edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(closed_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     if not contours:
         with open('debug_info_board.txt', 'a') as f:

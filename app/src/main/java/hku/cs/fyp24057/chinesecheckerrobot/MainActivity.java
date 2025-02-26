@@ -7,6 +7,8 @@ import androidx.fragment.app.Fragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG = "MainActivity";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -36,9 +38,19 @@ public class MainActivity extends AppCompatActivity {
             return false;
         });
 
-        // Set default fragment
+        // Set default fragment to the board fragment
         if (savedInstanceState == null) {
-            navView.setSelectedItemId(R.id.navigation_control);
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fragmentContainerView, new BoardFragment())
+                    .commit();
+            navView.setSelectedItemId(R.id.navigation_board);
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Shutdown the robot controller when the app is closing
+        RobotController.getInstance().shutdown();
     }
 }

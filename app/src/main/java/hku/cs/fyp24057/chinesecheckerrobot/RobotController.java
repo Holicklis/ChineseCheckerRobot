@@ -18,7 +18,8 @@ public class RobotController {
     private static final int COMMAND_QUEUE_SIZE = 10;
     private static final int COMMAND_INTERVAL_MS = 20;
     private static final int HTTP_TIMEOUT_MS = 1000;
-    private static final int MOVEMENT_DELAY_MS = 3000; // 3 seconds delay between movements
+    private static final int MOVEMENT_DELAY_MS = 1000; // Delay between movement steps
+    private static final float DEFAULT_SPEED = 0.3f; // Default speed value for all commands
 
     private String robotIp = "192.168.11.172";
     private final ExecutorService commandExecutor = Executors.newSingleThreadExecutor();
@@ -29,21 +30,23 @@ public class RobotController {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     // Thread-safe coordinates
-    private final AtomicReference<Float> x = new AtomicReference<>(484.18f);
-    private final AtomicReference<Float> y = new AtomicReference<>(-6.68f);
-    private final AtomicReference<Float> z = new AtomicReference<>(-40.31f);
+    private final AtomicReference<Float> x = new AtomicReference<>(304.24f);
+    private final AtomicReference<Float> y = new AtomicReference<>(6.53f);
+    private final AtomicReference<Float> z = new AtomicReference<>(240.92f);
     private final AtomicReference<Float> t = new AtomicReference<>(3.14f);
 
     private static class Command {
         final int cmdType;
         final float x, y, z, t;
+        final float spd;
 
-        Command(int cmdType, float x, float y, float z, float t) {
+        Command(int cmdType, float x, float y, float z, float t, float spd) {
             this.cmdType = cmdType;
             this.x = x;
             this.y = y;
             this.z = z;
             this.t = t;
+            this.spd = spd;
         }
     }
 
@@ -64,32 +67,87 @@ public class RobotController {
         this.robotIp = ip;
     }
 
-    public void moveToWithZSequence(float targetX, float targetY, float targetZ) {
-        // First move Z to 0
+    public String getRobotIp() {
+        return robotIp;
+    }
+
+    /**
+     * Enhanced movement sequence with four steps:
+     * 1. Lift to safe Z height first
+     * 2. Adjust torque angle
+     * 3. Move horizontally to position above target
+     * 4. Lower to final position
+     */
+    public void moveToWithPrecisionSequence(float targetX, float targetY, float targetZ, float targetTorque) {
+        // Step 1: Move Z to safe height while keeping current XY position
         float currentX = x.get();
         float currentY = y.get();
+        float currentZ = z.get();
+        float currentTorque = t.get();
 
-        // Step 1: Move Z to 0
+        float safeZ = 30f; // Safe height
+
         x.set(currentX);
         y.set(currentY);
-        z.set(0f);
-        queueCommand(1041);
+        z.set(safeZ);
+        t.set(currentTorque); // Keep current torque angle during lift
+        queueCommand(104);
 
-        // Step 2: Wait and then move to target position
+        Log.d(TAG, String.format("Step 1: Moving to safe height at (%.2f, %.2f, %.2f, %.2f)",
+                currentX, currentY, safeZ, currentTorque));
+
+        // Step 2: Adjust torque angle at safe height
         mainHandler.postDelayed(() -> {
-            x.set(targetX);
-            y.set(targetY);
-            z.set(targetZ);
-            queueCommand(1041);
+            x.set(currentX);
+            y.set(currentY);
+            z.set(safeZ);
+            t.set(targetTorque); // Now adjust torque angle
+            queueCommand(104);
+
+            Log.d(TAG, String.format("Step 2: Adjusting torque angle at (%.2f, %.2f, %.2f, %.2f)",
+                    currentX, currentY, safeZ, targetTorque));
+
+            // Step 3: Move XY to position above target (hover)
+            mainHandler.postDelayed(() -> {
+                x.set(targetX);
+                y.set(targetY);
+                z.set(safeZ);  // Maintain safe Z height
+                t.set(targetTorque);
+                queueCommand(104);
+
+                Log.d(TAG, String.format("Step 3: Hovering above target at (%.2f, %.2f, %.2f, %.2f)",
+                        targetX, targetY, safeZ, targetTorque));
+
+                // Step 4: Lower Z to the final target position
+                mainHandler.postDelayed(() -> {
+                    x.set(targetX);
+                    y.set(targetY);
+                    z.set(targetZ);
+                    t.set(targetTorque);
+                    queueCommand(104);
+
+                    Log.d(TAG, String.format("Step 4: Final descent to target at (%.2f, %.2f, %.2f, %.2f)",
+                            targetX, targetY, targetZ, targetTorque));
+                }, MOVEMENT_DELAY_MS);
+            }, MOVEMENT_DELAY_MS);
         }, MOVEMENT_DELAY_MS);
     }
 
     public void reset() {
-        x.set(484.18f);
-        y.set(-6.68f);
-        z.set(-40.31f);
-        t.set(3.14f);
-        queueCommand(100);
+        // Home position coordinates
+        float homeX = 313.76f;
+        float homeY = 6.35f;
+        float homeZ = 233.32f;
+        float homeTorque = 3.13f;
+
+        // Direct reset to home position without delays
+        x.set(homeX);
+        y.set(homeY);
+        z.set(homeZ);
+        t.set(homeTorque);
+        queueCommand(100); // Use command 100 which is a direct reset
+
+        Log.d(TAG, "Reset: Moving directly to home position");
     }
 
     private void startCommandProcessor() {
@@ -119,17 +177,20 @@ public class RobotController {
 
     private void queueCommand(int cmdType) {
         Command cmd = new Command(cmdType,
-                x.get(), y.get(), z.get(), t.get());
+                x.get(), y.get(), z.get(), t.get(), DEFAULT_SPEED);
         commandQueue.offer(cmd);
     }
 
     private void processCommand(Command cmd) {
         isProcessing.set(true);
         try {
-            String jsonCmd = cmd.cmdType == 100 ?
-                    "{\"T\":100}" :
-                    String.format("{\"T\":%d,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f}",
-                            cmd.cmdType, cmd.x, cmd.y, cmd.z, cmd.t);
+            String jsonCmd;
+            if (cmd.cmdType == 100) {
+                jsonCmd = "{\"T\":100}";
+            } else {
+                jsonCmd = String.format("{\"T\":%d,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f,\"spd\":%.2f}",
+                        cmd.cmdType, cmd.x, cmd.y, cmd.z, cmd.t, cmd.spd);
+            }
 
             String url = "http://" + robotIp + "/js?json=" + jsonCmd;
             sendHttpRequest(url);

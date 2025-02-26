@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class RobotControlFragment extends Fragment {
     private static final String TAG = "RobotControlFragment";
-    private static String ROBOT_IP = "192.168.4.1";
+    private static String ROBOT_IP = "192.168.11.172";
     private static final int COMMAND_QUEUE_SIZE = 10;
     private static final int COMMAND_INTERVAL_MS = 20;
     private static final int HTTP_TIMEOUT_MS = 1000;
