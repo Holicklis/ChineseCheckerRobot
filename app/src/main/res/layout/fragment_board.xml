@@ -31,12 +31,21 @@
 
     </LinearLayout>
 
+    <!-- New Button for Gripper Control -->
+    <Button
+        android:id="@+id/btnGripper"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Pick Marble"
+        android:layout_marginHorizontal="16dp"
+        app:layout_constraintTop_toBottomOf="@id/buttonContainer" />
+
     <hku.cs.fyp24057.chinesecheckerrobot.CheckerboardView
         android:id="@+id/checkerboardView"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_margin="16dp"
-        app:layout_constraintTop_toBottomOf="@id/buttonContainer"
+        app:layout_constraintTop_toBottomOf="@id/btnGripper"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
