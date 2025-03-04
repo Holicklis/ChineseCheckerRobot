@@ -220,9 +220,9 @@ public class BoardFragment extends Fragment {
         coordinates[3][15] = new CellCoordinate(15, 3, 316.51f, -18.53f, 240.92f, topTorque, true);
 
         // Bottom triangle (Player 4)
-        coordinates[16][12] = new CellCoordinate(12, 16, 304.24f, -70.53f, 240.92f, bottomTorque, true);
-        coordinates[15][11] = new CellCoordinate(11, 15, 300.15f, -66.53f, 240.92f, bottomTorque, true);
-        coordinates[15][13] = new CellCoordinate(13, 15, 308.33f, -66.53f, 240.92f, bottomTorque, true);
+        coordinates[16][12] = new CellCoordinate(12, 16, 1.45f, 0.08f, -71.17f, 1.08f, true);
+        coordinates[15][11] = new CellCoordinate(11, 15, 62.00f, 8.15f, -80.00f, 1.75f, true);
+        coordinates[15][13] = new CellCoordinate(13, 15, 30.48f, -3.05f, -81.65f, 1.23f, true);
         coordinates[14][10] = new CellCoordinate(10, 14, 296.06f, -62.53f, 240.92f, bottomTorque, true);
         coordinates[14][12] = new CellCoordinate(12, 14, 304.24f, -62.53f, 240.92f, bottomTorque, true);
         coordinates[14][14] = new CellCoordinate(14, 14, 312.42f, -62.53f, 240.92f, bottomTorque, true);
@@ -233,7 +233,7 @@ public class BoardFragment extends Fragment {
 
         // Some middle positions for testing
         coordinates[8][8] = new CellCoordinate(8, 8, 288.0f, -38.53f, 240.92f, centerTorque, true);
-        coordinates[8][12] = new CellCoordinate(12, 8, 253.00f, 11.0f, -83.07f, 2.1f, true);
+        coordinates[8][12] = new CellCoordinate(12, 8, 252.00f, 11.0f, -86.07f, 2.1f, true);
         coordinates[8][16] = new CellCoordinate(16, 8, 320.48f, -38.53f, 240.92f, centerTorque, true);
 
         // Add a few more test positions along the edges

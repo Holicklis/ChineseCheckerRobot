@@ -7,8 +7,6 @@ import androidx.fragment.app.Fragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class MainActivity extends AppCompatActivity {
-    private static final String TAG = "MainActivity";
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -24,9 +22,10 @@ public class MainActivity extends AppCompatActivity {
                 selectedFragment = new RobotControlFragment();
             } else if (itemId == R.id.navigation_camera) {
                 selectedFragment = new CameraFragment();
-            }
-            else if (itemId == R.id.navigation_board) {
+            } else if (itemId == R.id.navigation_board) {
                 selectedFragment = new BoardFragment();
+            } else if (itemId == R.id.navigation_ai) {
+                selectedFragment = new IntegratedAIGameFragment();
             }
 
             if (selectedFragment != null) {
@@ -38,19 +37,9 @@ public class MainActivity extends AppCompatActivity {
             return false;
         });
 
-        // Set default fragment to the board fragment
+        // Set default fragment
         if (savedInstanceState == null) {
-            getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.fragmentContainerView, new BoardFragment())
-                    .commit();
-            navView.setSelectedItemId(R.id.navigation_board);
+            navView.setSelectedItemId(R.id.navigation_control);
         }
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        // Shutdown the robot controller when the app is closing
-        RobotController.getInstance().shutdown();
     }
 }

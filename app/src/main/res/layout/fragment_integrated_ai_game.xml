@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <!-- Using the same camera preview constraints as in fragment_camera.xml -->
+        <androidx.camera.view.PreviewView
+            android:id="@+id/previewView"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintDimensionRatio="3:4"
+            app:layout_constraintWidth_percent="1.0"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginTop="16dp"/>
+
+        <LinearLayout
+            android:id="@+id/buttonContainer1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp"
+            app:layout_constraintTop_toBottomOf="@id/previewView">
+
+            <Button
+                android:id="@+id/btnCaptureEmpty"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Capture Empty" />
+
+            <Button
+                android:id="@+id/btnDetectCurrent"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Detect Current" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/buttonContainer2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp"
+            app:layout_constraintTop_toBottomOf="@id/buttonContainer1">
+
+            <Button
+                android:id="@+id/btnGetAIMove"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Get AI Move" />
+
+            <Button
+                android:id="@+id/btnExecuteMove"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Execute Move" />
+
+        </LinearLayout>
+
+        <!-- Modified with separate buttons for server and robot IP -->
+        <LinearLayout
+            android:id="@+id/ipConfigContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp"
+            app:layout_constraintTop_toBottomOf="@id/buttonContainer2">
+
+            <Button
+                android:id="@+id/btnConfigureServerIp"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Set Server IP" />
+
+            <Button
+                android:id="@+id/btnConfigureRobotIp"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Set Robot IP" />
+
+        </LinearLayout>
+
+        <!-- NEW: Gripper Control Buttons for Debugging -->
+        <LinearLayout
+            android:id="@+id/gripperButtonContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp"
+            app:layout_constraintTop_toBottomOf="@id/ipConfigContainer">
+
+            <Button
+                android:id="@+id/btnStartGripper"
+                android:layout_width="5dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Start Gripper"
+                android:backgroundTint="#4CAF50"/>
+
+            <Button
+                android:id="@+id/btnStopGripper"
+                android:layout_width="5dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Stop Gripper"
+                android:backgroundTint="#F44336"/>
+
+            <Button
+                android:id="@+id/btnResetArm"
+                android:layout_width="5dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Reset "
+                android:layout_marginStart="8dp"
+                android:backgroundTint="#FFC107"
+                android:textColor="#000000"
+                android:layout_marginTop="8dp"
+                />
+
+
+
+        </LinearLayout>
+
+
+
+
+        <!-- Debug Controls Section -->
+        <TextView
+            android:id="@+id/labelDebugControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Debug Board Position Controls:"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            app:layout_constraintTop_toBottomOf="@id/gripperButtonContainer"/>
+
+        <!-- Board X,Y Input Row -->
+        <LinearLayout
+            android:id="@+id/debugBoardXYRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            app:layout_constraintTop_toBottomOf="@id/labelDebugControls">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:hint="Board X">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etDebugBoardX"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:text="6" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Board Y">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etDebugBoardY"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:text="12" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnShowDebugInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Show Debug Info"
+            android:layout_marginTop="8dp"
+            app:layout_constraintTop_toBottomOf="@id/debugBoardXYRow" />
+
+        <Button
+            android:id="@+id/btnLookupCoords"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Lookup &amp; Move To Position"
+            android:layout_marginTop="8dp"
+            app:layout_constraintTop_toBottomOf="@id/btnShowDebugInfo" />
+
+        <TextView
+            android:id="@+id/tvMappedPosition"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#E0E0E0"
+            android:padding="8dp"
+            android:fontFamily="monospace"
+            android:text="Mapped Position: Not yet looked up"
+            android:layout_marginTop="8dp"
+            app:layout_constraintTop_toBottomOf="@id/btnLookupCoords"/>
+
+        <!-- Original board state and AI response content -->
+        <TextView
+            android:id="@+id/labelBoardState"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Board State:"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            app:layout_constraintTop_toBottomOf="@id/tvMappedPosition"/>
+
+        <TextView
+            android:id="@+id/tvBoardState"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#F5F5F5"
+            android:padding="8dp"
+            android:fontFamily="monospace"
+            android:layout_marginTop="4dp"
+            android:minHeight="120dp"
+            app:layout_constraintTop_toBottomOf="@id/labelBoardState"/>
+
+        <TextView
+            android:id="@+id/labelAIResponse"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="AI Response:"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            app:layout_constraintTop_toBottomOf="@id/tvBoardState"/>
+
+        <TextView
+            android:id="@+id/tvAIResponse"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#F5F5F5"
+            android:padding="8dp"
+            android:layout_marginTop="4dp"
+            android:minHeight="100dp"
+            android:layout_marginBottom="16dp"
+            app:layout_constraintTop_toBottomOf="@id/labelAIResponse"
+            app:layout_constraintBottom_toBottomOf="parent"/>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>
