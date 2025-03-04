@@ -39,6 +39,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -59,8 +60,6 @@ public class IntegratedAIGameFragment extends Fragment {
     private boolean isMoving = false;
 
     private Button btnShowDebugInfo;
-
-
 
     private static final String TAG = "IntegratedAIGameFrag";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
@@ -83,7 +82,7 @@ public class IntegratedAIGameFragment extends Fragment {
 
     // Network Clients
     private String serverIp = "192.168.11.230"; // Default
-    private String robotIp = "192.168.10.227";
+    private String robotIp = "192.168.11.172"; // Default
     private OkHttpClient client;
     private BoardDetectionClient detectionClient;
 
@@ -93,7 +92,6 @@ public class IntegratedAIGameFragment extends Fragment {
     // Game State
     private List<String> currentBoardState;
     private JSONObject lastRecommendedMove;
-
     private JSONArray lastRecommendedMoveSequence = null;
 
     private Button btnConfigureServerIp;
@@ -103,9 +101,6 @@ public class IntegratedAIGameFragment extends Fragment {
     private Button btnStopGripper;
 
     private Button btnResetArm;
-
-
-
 
     private boolean isPlayer1Turn = true; // Default, can be toggled
 
@@ -164,7 +159,6 @@ public class IntegratedAIGameFragment extends Fragment {
         btnStopGripper = view.findViewById(R.id.btnStopGripper);
 
         btnResetArm = view.findViewById(R.id.btnResetArm);
-
 
         // Set up listeners
         setupButtons();
@@ -302,7 +296,6 @@ public class IntegratedAIGameFragment extends Fragment {
         });
     }
 
-
     private void controlGripper(boolean close) {
         isMoving = true;
 
@@ -323,7 +316,6 @@ public class IntegratedAIGameFragment extends Fragment {
         }, 1000);
     }
 
-
     // Split the IP configuration into two separate methods
     private void showServerIpConfigDialog() {
         new IpConfigDialog(
@@ -340,6 +332,7 @@ public class IntegratedAIGameFragment extends Fragment {
                 }
         ).show();
     }
+
     private void showRobotIpConfigDialog() {
         new IpConfigDialog(
                 requireContext(),
@@ -376,6 +369,7 @@ public class IntegratedAIGameFragment extends Fragment {
                 "Debug info displayed",
                 Toast.LENGTH_SHORT).show();
     }
+
     private void lookupAndMoveToPosition() {
         if (isMoving) {
             Toast.makeText(requireContext(),
@@ -425,67 +419,43 @@ public class IntegratedAIGameFragment extends Fragment {
             isMoving = true;
             btnLookupCoords.setEnabled(false);
 
-            // Execute movement in background
-            new Thread(() -> {
-                try {
-                    // Use precision sequence to move to this position
-                    robotController.moveToWithPrecisionSequence(
-                            cellCoord.getX(),
-                            cellCoord.getY(),
-                            cellCoord.getZ(),
-                            cellCoord.getTorque()
-                    );
+            // Use the improved controller to move with verification
+            CompletableFuture<Boolean> moveFuture = robotController.executeVerifiedMovement(
+                    cellCoord.getX(), cellCoord.getY(), cellCoord.getZ(), cellCoord.getTorque(),
+                    new RobotController.MovementCallback() {
+                        @Override
+                        public void onSuccess() {
+                            requireActivity().runOnUiThread(() -> {
+                                isMoving = false;
+                                btnLookupCoords.setEnabled(true);
+                                Toast.makeText(requireContext(),
+                                        "Movement completed successfully",
+                                        Toast.LENGTH_SHORT).show();
+                            });
+                        }
 
-                    // Wait for movement to complete (4 steps * delay)
-                    Thread.sleep(4 * 2000);
+                        @Override
+                        public void onFailure(String errorMessage) {
+                            requireActivity().runOnUiThread(() -> {
+                                isMoving = false;
+                                btnLookupCoords.setEnabled(true);
+                                Toast.makeText(requireContext(),
+                                        "Movement failed: " + errorMessage,
+                                        Toast.LENGTH_SHORT).show();
+                            });
+                        }
 
-                    // Re-enable UI on main thread
-                    requireActivity().runOnUiThread(() -> {
-                        isMoving = false;
-                        btnLookupCoords.setEnabled(true);
-                        Toast.makeText(requireContext(),
-                                "Movement completed",
-                                Toast.LENGTH_SHORT).show();
+                        @Override
+                        public void onProgress(String status) {
+                            requireActivity().runOnUiThread(() -> {
+                                tvMappedPosition.append("\n" + status);
+                            });
+                        }
                     });
-
-                } catch (Exception e) {
-                    Log.e(TAG, "Error moving to position: " + e.getMessage(), e);
-                    requireActivity().runOnUiThread(() -> {
-                        isMoving = false;
-                        btnLookupCoords.setEnabled(true);
-                        Toast.makeText(requireContext(),
-                                "Error: " + e.getMessage(),
-                                Toast.LENGTH_SHORT).show();
-                    });
-                }
-            }).start();
 
         } catch (NumberFormatException e) {
             tvMappedPosition.setText("Invalid coordinates. Please enter valid numbers.");
         }
-    }
-
-    private void showIpConfigDialog() {
-        new IpConfigDialog(
-                requireContext(),
-                serverIp,
-                "Configure Server IP",
-                newIp -> {
-                    // Update the server IP for detection client
-                    serverIp = newIp;
-                    detectionClient = new BoardDetectionClient(serverIp);
-
-                    // IMPORTANT: Also update the robot controller's IP
-                    robotController.setRobotIp(newIp);
-
-                    Toast.makeText(requireContext(),
-                            "IP updated to: " + newIp + " (for both server and robot)",
-                            Toast.LENGTH_SHORT).show();
-
-                    // Log the update for debugging
-                    Log.d(TAG, "Updated IP to " + newIp + " for both server and robot controller");
-                }
-        ).show();
     }
 
     private void captureEmptyBoard() {
@@ -699,104 +669,8 @@ public class IntegratedAIGameFragment extends Fragment {
         }
     }
 
-    private String formatMoveInfo(JSONObject move) throws JSONException {
-        JSONObject origin = move.getJSONObject("origin");
-        JSONObject destination = move.getJSONObject("destination");
-
-        return String.format("Move from: (%d, %d)\nMove to: (%d, %d)",
-                origin.getInt("x"), origin.getInt("y"),
-                destination.getInt("x"), destination.getInt("y"));
-    }
-
     /**
-     * Executes a move from the AI server
-     */
-    private void executeAIMove(JSONObject move) {
-        try {
-            // Disable the button to prevent multiple executions
-            btnExecuteMove.setEnabled(false);
-            tvAIResponse.append("\n\nExecuting move...");
-
-            JSONObject origin = move.getJSONObject("origin");
-            JSONObject destination = move.getJSONObject("destination");
-
-            // If the AI returns a path/sequence, it would be in a format like:
-            // {"origin": {"x": 3, "y": 13}, "path": [{"x": 4, "y": 12}, {"x": 5, "y": 11}, ...]}
-            JSONArray pathSequence = move.optJSONArray("path");
-
-            // Get the origin coordinates
-            int originX = origin.getInt("x");
-            int originY = origin.getInt("y");
-            CellCoordinate originCoord = BoardCoordinatesAdapter.getInstance()
-                    .getBoardCellCoordinate(originX, originY);
-
-            if (originCoord == null) {
-                tvAIResponse.append("\nError: Could not find coordinates for origin (" +
-                        originX + "," + originY + ")");
-                btnExecuteMove.setEnabled(true);
-                return;
-            }
-
-            // Get the destination coordinates
-            int destX = destination.getInt("x");
-            int destY = destination.getInt("y");
-            CellCoordinate destCoord = BoardCoordinatesAdapter.getInstance()
-                    .getBoardCellCoordinate(destX, destY);
-
-            if (destCoord == null) {
-                tvAIResponse.append("\nError: Could not find coordinates for destination (" +
-                        destX + "," + destY + ")");
-                btnExecuteMove.setEnabled(true);
-                return;
-            }
-
-            // Process intermediate points if available
-            List<CellCoordinate> intermediatePoints = null;
-            if (pathSequence != null && pathSequence.length() > 0) {
-                intermediatePoints = new ArrayList<>();
-
-                for (int i = 0; i < pathSequence.length(); i++) {
-                    JSONObject point = pathSequence.getJSONObject(i);
-                    int x = point.getInt("x");
-                    int y = point.getInt("y");
-
-                    CellCoordinate coord = BoardCoordinatesAdapter.getInstance()
-                            .getBoardCellCoordinate(x, y);
-
-                    if (coord != null) {
-                        intermediatePoints.add(coord);
-                    } else {
-                        Log.w(TAG, "No mapping found for intermediate point (" + x + "," + y + ")");
-                    }
-                }
-            }
-
-            // Execute the move
-            robotController.executeCheckerMove(originCoord, destCoord, intermediatePoints);
-
-            // Schedule UI update after expected move duration
-            int totalSteps = 9 + (intermediatePoints == null ? 0 : intermediatePoints.size());
-            int estimatedDuration = totalSteps * 2000; // 2 seconds per step
-
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                tvAIResponse.append("\nMove completed!");
-                btnExecuteMove.setEnabled(true);
-                btnGetAIMove.setEnabled(false);
-                btnDetectCurrent.setEnabled(true);
-
-                // Toggle turn for next move
-                isPlayer1Turn = !isPlayer1Turn;
-            }, estimatedDuration);
-
-        } catch (JSONException e) {
-            tvAIResponse.append("\nError parsing move: " + e.getMessage());
-            btnExecuteMove.setEnabled(true);
-        }
-    }
-
-    /**
-     * Execute a simplified move sequence from the AI recommendations.
-     * Follows a clear, sequential process with adequate delays between steps.
+     * Execute a move sequence from the AI recommendations using the improved RobotController
      * @param moveSequence JSONArray of coordinates from the AI
      */
     private void executeAIMoveSequence(JSONArray moveSequence) {
@@ -809,242 +683,106 @@ public class IntegratedAIGameFragment extends Fragment {
         btnExecuteMove.setEnabled(false);
         tvAIResponse.append("\n\nExecuting move sequence...");
 
-        new Thread(() -> {
-            try {
-                // Step 1: Convert JSON array of board coordinates into CellCoordinates
-                List<CellCoordinate> path = new ArrayList<>();
-                for (int i = 0; i < moveSequence.length(); i++) {
-                    JSONObject coordObj = moveSequence.getJSONObject(i);
-                    int boardX = coordObj.getInt("x");
-                    int boardY = coordObj.getInt("y");
+        try {
+            // Step 1: Convert JSON array of board coordinates into CellCoordinates
+            List<CellCoordinate> path = new ArrayList<>();
+            for (int i = 0; i < moveSequence.length(); i++) {
+                JSONObject coordObj = moveSequence.getJSONObject(i);
+                int boardX = coordObj.getInt("x");
+                int boardY = coordObj.getInt("y");
 
-                    // Convert board coords -> robot coords
-                    CellCoordinate cellCoord = BoardCoordinatesAdapter.getInstance()
-                            .getBoardCellCoordinate(boardX, boardY);
-                    if (cellCoord == null) {
-                        Log.e(TAG, "No mapping for board coords (" + boardX + "," + boardY + ")");
-                        continue;
-                    }
-                    path.add(cellCoord);
+                // Convert board coords -> robot coords
+                CellCoordinate cellCoord = BoardCoordinatesAdapter.getInstance()
+                        .getBoardCellCoordinate(boardX, boardY);
+                if (cellCoord == null) {
+                    Log.e(TAG, "No mapping for board coords (" + boardX + "," + boardY + ")");
+                    continue;
                 }
+                path.add(cellCoord);
+            }
 
-                if (path.size() < 2) {
-                    requireActivity().runOnUiThread(() -> {
-                        btnExecuteMove.setEnabled(true);
-                        Toast.makeText(requireContext(), "Invalid path from AI", Toast.LENGTH_SHORT).show();
-                    });
-                    return;
-                }
+            if (path.size() < 2) {
+                requireActivity().runOnUiThread(() -> {
+                    btnExecuteMove.setEnabled(true);
+                    Toast.makeText(requireContext(), "Invalid path from AI", Toast.LENGTH_SHORT).show();
+                });
+                return;
+            }
 
-                // Log the path for debugging
-                StringBuilder pathInfo = new StringBuilder("Path: ");
-                for (CellCoordinate coord : path) {
-                    pathInfo.append(String.format("(%.1f,%.1f) ", coord.getX(), coord.getY()));
-                }
-                Log.d(TAG, pathInfo.toString());
+            // Log the path for debugging
+            StringBuilder pathInfo = new StringBuilder("Path: ");
+            for (CellCoordinate coord : path) {
+                pathInfo.append(String.format("(%.1f,%.1f) ", coord.getX(), coord.getY()));
+            }
+            Log.d(TAG, pathInfo.toString());
 
-                // Step 2: Get references
-                RobotController robot = RobotController.getInstance();
-                final int STEP_DELAY = 5000; // 4 seconds between steps
+            // Set moving flag
+            isMoving = true;
 
-                // Step 3: Reset to initial position
-                updateStatus("Resetting to home position...");
-                robot.reset();
-                Thread.sleep(STEP_DELAY);
+            // Get origin and destination
+            CellCoordinate origin = path.get(0);
+            CellCoordinate destination = path.get(path.size() - 1);
 
-                // Step 4: First position is starting cell
-                CellCoordinate startCell = path.get(0);
-                float safeZ = -40.0f; // Safe height to avoid collisions
-
-                // Step 5: Move above starting cell
-                updateStatus("Moving above starting position...");
-                robot.moveToWithPrecisionSequence(
-                        startCell.getX(),
-                        startCell.getY(),
-                        safeZ,
-                        startCell.getTorque()
-                );
-                Thread.sleep(STEP_DELAY);
-
-                // Step 6: Move down to starting cell
-                updateStatus("Moving down to pick up marble...");
-                robot.moveToWithPrecisionSequence(
-                        startCell.getX(),
-                        startCell.getY(),
-                        startCell.getZ(),
-                        startCell.getTorque()
-                );
-                Thread.sleep(STEP_DELAY);
-
-                // Step 7: Close gripper (grab piece)
-                updateStatus("Grabbing marble...");
-                robot.controlGripper(true);  // Close gripper
-                Thread.sleep(STEP_DELAY);
-
-                // Step 8: Move up to safe height
-                updateStatus("Moving back up to safe height...");
-                robot.moveToWithPrecisionSequence(
-                        startCell.getX(),
-                        startCell.getY(),
-                        safeZ,
-                        startCell.getTorque()
-                );
-                Thread.sleep(STEP_DELAY);
-
-                // Step 9: Process intermediate positions (if any)
+            // Create intermediate points list (all but first and last)
+            List<CellCoordinate> intermediatePoints = null;
+            if (path.size() > 2) {
+                intermediatePoints = new ArrayList<>();
                 for (int i = 1; i < path.size() - 1; i++) {
-                    CellCoordinate midCell = path.get(i);
-                    updateStatus("Moving to intermediate position " + i + "...");
-
-                    // Move above the intermediate cell
-                    robot.moveToWithPrecisionSequence(
-                            midCell.getX(),
-                            midCell.getY(),
-                            safeZ,
-                            midCell.getTorque()
-                    );
-                    Thread.sleep(STEP_DELAY);
+                    intermediatePoints.add(path.get(i));
                 }
-
-                // Step 10: Move to destination (last cell)
-                CellCoordinate destCell = path.get(path.size() - 1);
-                updateStatus("Moving above destination...");
-                robot.moveToWithPrecisionSequence(
-                        destCell.getX(),
-                        destCell.getY(),
-                        safeZ,
-                        destCell.getTorque()
-                );
-                Thread.sleep(STEP_DELAY);
-
-                // Step 11: Lower to destination
-                updateStatus("Moving down to place marble...");
-                robot.moveToWithPrecisionSequence(
-                        destCell.getX(),
-                        destCell.getY(),
-                        destCell.getZ(),
-                        destCell.getTorque()
-                );
-                Thread.sleep(STEP_DELAY);
-
-                // Step 12: Open gripper (release piece)
-                updateStatus("Releasing marble...");
-                robot.controlGripper(false);  // Open gripper
-                Thread.sleep(STEP_DELAY);
-
-                // Step 13: Move back up
-                updateStatus("Moving back to safe height...");
-                robot.moveToWithPrecisionSequence(
-                        destCell.getX(),
-                        destCell.getY(),
-                        safeZ,
-                        destCell.getTorque()
-                );
-                Thread.sleep(STEP_DELAY);
-
-                // Move completed
-                requireActivity().runOnUiThread(() -> {
-                    btnExecuteMove.setEnabled(true);
-                    tvAIResponse.append("\nMove sequence completed!");
-                    Toast.makeText(requireContext(), "Move sequence completed", Toast.LENGTH_SHORT).show();
-                });
-
-            } catch (Exception e) {
-                Log.e(TAG, "Error executing AI move sequence", e);
-                requireActivity().runOnUiThread(() -> {
-                    btnExecuteMove.setEnabled(true);
-                    tvAIResponse.append("\nError: " + e.getMessage());
-                    Toast.makeText(requireContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                });
             }
-        }).start();
-    }
 
-    /**
-     * Helper method to update status on UI thread
-     */
-    private void updateStatus(String status) {
-        Log.d(TAG, status);
-        requireActivity().runOnUiThread(() -> {
-            tvAIResponse.append("\n" + status);
-        });
-    }
+            // Use the improved robot controller to execute the move sequence
+            robotController.executeCheckerMoveWithVerification(
+                    origin, destination, intermediatePoints,
+                    new RobotController.MovementCallback() {
+                        @Override
+                        public void onSuccess() {
+                            requireActivity().runOnUiThread(() -> {
+                                isMoving = false;
+                                btnExecuteMove.setEnabled(true);
+                                tvAIResponse.append("\nMove sequence completed successfully!");
+                                Toast.makeText(requireContext(),
+                                        "Move sequence completed successfully",
+                                        Toast.LENGTH_SHORT).show();
 
-    private void executeRobotMove(CellCoordinate origin, CellCoordinate destination) {
-        // Disable button to prevent multiple executions
-        btnExecuteMove.setEnabled(false);
-        tvAIResponse.append("\n\nExecuting robot move...");
+                                // Re-detect the board state after successful move
+//                                btnDetectCurrent.performClick();
+                            });
+                        }
 
-        // Define the sequence of operations required for a complete move
-        final int STEP_DELAY_MS = 2000; // Time between each step
+                        @Override
+                        public void onFailure(String errorMessage) {
+                            requireActivity().runOnUiThread(() -> {
+                                isMoving = false;
+                                btnExecuteMove.setEnabled(true);
+                                tvAIResponse.append("\nMove failed: " + errorMessage);
+                                Toast.makeText(requireContext(),
+                                        "Movement failed: " + errorMessage,
+                                        Toast.LENGTH_SHORT).show();
+                            });
+                        }
 
-        new Thread(() -> {
-            try {
-                // Step 1: Move to position above the origin
-                Log.d(TAG, "Step 1: Moving to position above the origin piece");
-                robotController.moveToWithPrecisionSequence(
-                        origin.getX(), origin.getY(), 100.0f, origin.getTorque());
-                Thread.sleep(STEP_DELAY_MS);
+                        @Override
+                        public void onProgress(String status) {
+                            requireActivity().runOnUiThread(() -> {
+                                tvAIResponse.append("\n" + status);
+                            });
+                        }
+                    }
+            );
 
-                // Step 2: Lower to the piece
-                Log.d(TAG, "Step 2: Lowering to grab the piece");
-                robotController.moveToWithPrecisionSequence(
-                        origin.getX(), origin.getY(), origin.getZ(), origin.getTorque());
-                Thread.sleep(STEP_DELAY_MS);
-
-                // Step 3: Close gripper (grab piece)
-                Log.d(TAG, "Step 3: Grabbing the piece");
-                // You would add code here to activate the gripper
-                Thread.sleep(STEP_DELAY_MS);
-
-                // Step 4: Lift piece up
-                Log.d(TAG, "Step 4: Lifting the piece");
-                robotController.moveToWithPrecisionSequence(
-                        origin.getX(), origin.getY(), 100.0f, origin.getTorque());
-                Thread.sleep(STEP_DELAY_MS);
-
-                // Step 5: Move to position above destination
-                Log.d(TAG, "Step 5: Moving above the destination");
-                robotController.moveToWithPrecisionSequence(
-                        destination.getX(), destination.getY(), 100.0f, destination.getTorque());
-                Thread.sleep(STEP_DELAY_MS);
-
-                // Step 6: Lower to destination position
-                Log.d(TAG, "Step 6: Lowering to destination position");
-                robotController.moveToWithPrecisionSequence(
-                        destination.getX(), destination.getY(), destination.getZ(), destination.getTorque());
-                Thread.sleep(STEP_DELAY_MS);
-
-                // Step 7: Open gripper (release piece)
-                Log.d(TAG, "Step 7: Releasing the piece");
-                // You would add code here to deactivate the gripper
-                Thread.sleep(STEP_DELAY_MS);
-
-                // Step 8: Move back up to safe height
-                Log.d(TAG, "Step 8: Moving back to safe height");
-                robotController.moveToWithPrecisionSequence(
-                        destination.getX(), destination.getY(), 100.0f, destination.getTorque());
-
-                // Update the board state in the UI
-                requireActivity().runOnUiThread(() -> {
-                    tvAIResponse.append("\nMove completed successfully!");
-                    tvAIResponse.append("\nPlease detect the current board state again to continue the game.");
-                    btnExecuteMove.setEnabled(false);
-                    btnGetAIMove.setEnabled(false);
-                    btnDetectCurrent.setEnabled(true);
-
-                    // Toggle turn for next move
-                    isPlayer1Turn = !isPlayer1Turn;
-                });
-
-            } catch (Exception e) {
-                Log.e(TAG, "Error executing robot move: " + e.getMessage(), e);
-                requireActivity().runOnUiThread(() -> {
-                    tvAIResponse.append("\nError during move: " + e.getMessage());
-                    btnExecuteMove.setEnabled(true);
-                });
-            }
-        }).start();
+        } catch (Exception e) {
+            Log.e(TAG, "Error executing AI move sequence", e);
+            requireActivity().runOnUiThread(() -> {
+                isMoving = false;
+                btnExecuteMove.setEnabled(true);
+                tvAIResponse.append("\nError: " + e.getMessage());
+                Toast.makeText(requireContext(),
+                        "Error: " + e.getMessage(),
+                        Toast.LENGTH_SHORT).show();
+            });
+        }
     }
 
     private void startCamera() {

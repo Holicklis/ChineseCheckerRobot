@@ -3,54 +3,51 @@ package hku.cs.fyp24057.chinesecheckerrobot;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * RobotController coordinates queued robot commands over HTTP,
- * plus high-level convenience methods for picking up / placing marbles.
- */
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
 public class RobotController {
     private static final String TAG = "RobotController";
 
-    // Queue & executor settings
-    private static final int COMMAND_QUEUE_SIZE = 10;
-    private static final int COMMAND_INTERVAL_MS = 20;   // Min gap between commands
-    private static final int HTTP_TIMEOUT_MS = 1000;     // HTTP connect/read timeouts
-    private static final float DEFAULT_SPEED = 0.3f;     // default move speed
-
-    // Movement delays
-    private static final int MOVEMENT_DELAY_MS = 5000;   // Wait after each multi-step movement
-    // "Safe" overhead height to avoid collisions
+    // Settings
+    private static final int HTTP_TIMEOUT_MS = 1000;
+    private static final float DEFAULT_SPEED = 0.25f;  // Speed setting
+    private static final int MOVEMENT_DELAY_MS = 5000;
+    private static final int SHORT_DELAY_MS = 5000;
+    private static final float DEFAULT_POSITION_TOLERANCE = 5.0f;
+    private static final int DEFAULT_MAX_RETRIES = 3;
+    private static final int VERIFICATION_DELAY_MS = 500;
     private static final float SAFE_Z = -60f;
-    // Slight offset to go near the surface for pick/place
-    private static final float BOARD_OFFSET = 5f;
 
     private String robotIp = "192.168.11.172";
-
-    // Single-threaded executor for commands
+    private OkHttpClient httpClient;
     private final ExecutorService commandExecutor = Executors.newSingleThreadExecutor();
-    private final BlockingQueue<Command> commandQueue = new ArrayBlockingQueue<>(COMMAND_QUEUE_SIZE);
-
-    private final AtomicBoolean isRunning = new AtomicBoolean(true);
-    private final AtomicBoolean isProcessing = new AtomicBoolean(false);
-    private volatile long lastCommandTime = 0;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    // The current state of the robot (x,y,z,t)
-    private final AtomicReference<Float> x = new AtomicReference<>(304.24f);
-    private final AtomicReference<Float> y = new AtomicReference<>(6.53f);
-    private final AtomicReference<Float> z = new AtomicReference<>(240.92f);
-    private final AtomicReference<Float> t = new AtomicReference<>(3.14f);
+    public interface MovementCallback {
+        void onSuccess();
+        void onFailure(String errorMessage);
+        void onProgress(String status);
+    }
 
     private static RobotController instance;
 
@@ -62,28 +59,11 @@ public class RobotController {
     }
 
     private RobotController() {
-        startCommandProcessor();
+        httpClient = new OkHttpClient.Builder()
+                .connectTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .readTimeout(HTTP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .build();
     }
-
-    // Command structure for queued commands
-    private static class Command {
-        final int cmdType;
-        final float x, y, z, t;  // coords & torque
-        final float spd;
-
-        Command(int cmdType, float x, float y, float z, float t, float spd) {
-            this.cmdType = cmdType;
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.t = t;
-            this.spd = spd;
-        }
-    }
-
-    // --------------------------
-    // Basic config & utilities
-    // --------------------------
 
     public void setRobotIp(String ip) {
         this.robotIp = ip;
@@ -94,7 +74,6 @@ public class RobotController {
     }
 
     public void shutdown() {
-        isRunning.set(false);
         commandExecutor.shutdownNow();
         try {
             commandExecutor.awaitTermination(100, TimeUnit.MILLISECONDS);
@@ -103,184 +82,490 @@ public class RobotController {
         }
     }
 
-    /**
-     * Launches the background thread that processes commands from the queue.
-     */
-    private void startCommandProcessor() {
-        commandExecutor.submit(() -> {
-            while (isRunning.get() && !Thread.currentThread().isInterrupted()) {
-                try {
-                    long currentTime = System.currentTimeMillis();
-                    long timeSinceLastCommand = currentTime - lastCommandTime;
+    public void reset() {
+        String jsonCmd = "{\"T\":100}";
+        sendHttpCommand(jsonCmd);
+        Log.d(TAG, "Reset command sent");
+    }
 
-                    // If enough time has passed & we're not currently processing
-                    if (timeSinceLastCommand >= COMMAND_INTERVAL_MS && !isProcessing.get()) {
-                        Command cmd = commandQueue.poll();
-                        if (cmd != null) {
-                            processCommand(cmd);
-                            lastCommandTime = currentTime;
-                        }
+    public void moveTo(float x, float y, float z, float torque) {
+        String jsonCmd = String.format("{\"T\":104,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f,\"spd\":%.2f}",
+                x, y, z, torque, DEFAULT_SPEED);
+        sendHttpCommand(jsonCmd);
+        Log.d(TAG, String.format("Moving to (%.2f, %.2f, %.2f, %.2f) with speed %.2f",
+                x, y, z, torque, DEFAULT_SPEED));
+    }
+
+    public void moveToWithPrecisionSequence(float targetX, float targetY, float targetZ, float targetTorque) {
+        float safeZ = SAFE_Z;
+
+        // Get current position feedback to keep original XY in first step
+        JSONObject currentPos = getPositionFeedback();
+        float currentX = targetX;
+        float currentY = targetY;
+        float currentTorque = targetTorque;
+
+        // Try to use current position if available
+        if (currentPos != null) {
+            try {
+                currentX = (float) currentPos.getDouble("x");
+                currentY = (float) currentPos.getDouble("y");
+                currentTorque = (float) currentPos.getDouble("t");
+            } catch (JSONException e) {
+                Log.e(TAG, "Error parsing current position, using target coords instead: " + e.getMessage());
+            }
+        }
+
+        // Step 1: rise to safe Z first (keep XY unchanged)
+        String jsonCmd1 = String.format("{\"T\":104,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f,\"spd\":%.2f}",
+                currentX, currentY, safeZ + 20f, currentTorque, DEFAULT_SPEED);
+        sendHttpCommand(jsonCmd1);
+        Log.d(TAG, "Step1: Move to safe Z (keeping current XY)");
+
+        try {
+            Thread.sleep(SHORT_DELAY_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // Step 2: adjust torque
+        String jsonCmd2 = String.format("{\"T\":104,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f,\"spd\":%.2f}",
+                currentX, currentY, safeZ + 20f, targetTorque, DEFAULT_SPEED);
+        sendHttpCommand(jsonCmd2);
+        Log.d(TAG, "Step2: Adjust torque");
+
+        try {
+            Thread.sleep(SHORT_DELAY_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // Step 3: move to target XY at safe Z
+        String jsonCmd3 = String.format("{\"T\":104,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f,\"spd\":%.2f}",
+                targetX, targetY, safeZ, targetTorque, DEFAULT_SPEED);
+        sendHttpCommand(jsonCmd3);
+        Log.d(TAG, "Step3: Hover above target");
+
+        try {
+            Thread.sleep(SHORT_DELAY_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // Step 4: go down to targetZ
+        String jsonCmd4 = String.format("{\"T\":104,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f,\"spd\":%.2f}",
+                targetX, targetY, targetZ, targetTorque, DEFAULT_SPEED);
+        sendHttpCommand(jsonCmd4);
+        Log.d(TAG, "Step4: Descend to final position");
+    }
+
+    public JSONObject getPositionFeedback() {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final AtomicReference<JSONObject> resultRef = new AtomicReference<>();
+
+        String jsonCmd = "{\"T\":105}";
+        String url = "http://" + robotIp + "/js?json=" + jsonCmd;
+
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
+
+        httpClient.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.e(TAG, "Failed to get position feedback: " + e.getMessage());
+                latch.countDown();
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (response.isSuccessful() && response.body() != null) {
+                    try {
+                        String responseBody = response.body().string();
+                        JSONObject jsonResponse = new JSONObject(responseBody);
+                        resultRef.set(jsonResponse);
+                    } catch (JSONException e) {
+                        Log.e(TAG, "Error parsing position feedback: " + e.getMessage());
                     }
+                }
+                latch.countDown();
+            }
+        });
 
-                    // Sleep to avoid busy loop
-                    long sleepTime = Math.max(1, COMMAND_INTERVAL_MS - timeSinceLastCommand);
-                    Thread.sleep(sleepTime);
+        try {
+            latch.await(3, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
 
+        return resultRef.get();
+    }
+
+    public boolean verifyPosition(float targetX, float targetY, float targetZ, float tolerance) {
+        JSONObject feedback = getPositionFeedback();
+        if (feedback == null) {
+            Log.e(TAG, "Position verification failed: Could not get feedback");
+            return false;
+        }
+
+        try {
+            float currentX = (float) feedback.getDouble("x");
+            float currentY = (float) feedback.getDouble("y");
+            float currentZ = (float) feedback.getDouble("z");
+
+            boolean isPositionCorrect =
+                    Math.abs(currentX - targetX) <= tolerance &&
+                            Math.abs(currentY - targetY) <= tolerance &&
+                            Math.abs(currentZ - targetZ) <= tolerance;
+
+            Log.d(TAG, String.format("Position verification: Target(%.2f,%.2f,%.2f) Current(%.2f,%.2f,%.2f) Result: %s",
+                    targetX, targetY, targetZ, currentX, currentY, currentZ, isPositionCorrect));
+
+            return isPositionCorrect;
+
+        } catch (JSONException e) {
+            Log.e(TAG, "Error parsing position data: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public CompletableFuture<Boolean> executeVerifiedMovement(
+            float targetX, float targetY, float targetZ, float targetTorque,
+            MovementCallback callback) {
+
+        return executeVerifiedMovement(targetX, targetY, targetZ, targetTorque,
+                DEFAULT_POSITION_TOLERANCE, DEFAULT_MAX_RETRIES, callback);
+    }
+
+    public CompletableFuture<Boolean> executeVerifiedMovement(
+            float targetX, float targetY, float targetZ, float targetTorque,
+            float tolerance, int maxRetries, MovementCallback callback) {
+
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
+
+        commandExecutor.submit(() -> {
+            int attemptCount = 0;
+            boolean success = false;
+
+            while (attemptCount < maxRetries && !success) {
+                attemptCount++;
+
+                if (callback != null) {
+                    String statusMsg = String.format("Moving to (%.2f,%.2f,%.2f) - Attempt %d of %d",
+                            targetX, targetY, targetZ, attemptCount, maxRetries);
+                    callback.onProgress(statusMsg);
+                }
+
+                moveToWithPrecisionSequence(targetX, targetY, targetZ, targetTorque);
+
+                try {
+                    Thread.sleep(MOVEMENT_DELAY_MS);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    break;
+                    if (callback != null) callback.onFailure("Movement interrupted");
+                    future.complete(false);
+                    return;
                 }
+
+                try {
+                    Thread.sleep(VERIFICATION_DELAY_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+
+                success = verifyPosition(targetX, targetY, targetZ, tolerance);
+
+                if (success) {
+                    if (callback != null) callback.onSuccess();
+                    future.complete(true);
+                    return;
+                } else {
+                    Log.w(TAG, "Position verification failed, attempt: " + attemptCount);
+                    if (callback != null && attemptCount < maxRetries) {
+                        callback.onProgress("Position verification failed, retrying...");
+                    }
+                }
+            }
+
+            if (callback != null) {
+                callback.onFailure("Failed to reach position after " + maxRetries + " attempts");
+            }
+            future.complete(false);
+        });
+
+        return future;
+    }
+
+    public void controlGripper(boolean close) {
+        String jsonCmd = close ? "{\"T\":116,\"cmd\":1}" : "{\"T\":116,\"cmd\":0}";
+        sendHttpCommand(jsonCmd);
+        Log.d(TAG, close ? "Gripper closing" : "Gripper opening");
+    }
+
+    public void pickUpMarbleWithVerification(CellCoordinate cell, MovementCallback callback) {
+        commandExecutor.submit(() -> {
+            try {
+                if (callback != null) callback.onProgress("Starting pickup");
+
+                // Move overhead
+                CompletableFuture<Boolean> moveAboveFuture = executeVerifiedMovement(
+                        cell.getX(), cell.getY(), SAFE_Z, cell.getTorque(),
+                        new MovementCallback() {
+                            @Override public void onSuccess() { /* handled in main sequence */ }
+                            @Override public void onFailure(String errorMessage) {
+                                if (callback != null) callback.onFailure("Failed to move above: " + errorMessage);
+                            }
+                            @Override public void onProgress(String status) {
+                                if (callback != null) callback.onProgress(status);
+                            }
+                        });
+
+                if (!moveAboveFuture.get()) {
+                    if (callback != null) callback.onFailure("Failed to move above");
+                    return;
+                }
+
+                // Move down
+                CompletableFuture<Boolean> moveDownFuture = executeVerifiedMovement(
+                        cell.getX(), cell.getY(), cell.getZ(), cell.getTorque(),
+                        new MovementCallback() {
+                            @Override public void onSuccess() { /* handled in main sequence */ }
+                            @Override public void onFailure(String errorMessage) {
+                                if (callback != null) callback.onFailure("Failed to move down: " + errorMessage);
+                            }
+                            @Override public void onProgress(String status) {
+                                if (callback != null) callback.onProgress(status);
+                            }
+                        });
+
+                if (!moveDownFuture.get()) {
+                    if (callback != null) callback.onFailure("Failed to move down");
+                    return;
+                }
+
+                // Close gripper
+                if (callback != null) callback.onProgress("Closing gripper");
+                controlGripper(true);
+                Thread.sleep(1000);
+
+                // Move back up
+                CompletableFuture<Boolean> moveUpFuture = executeVerifiedMovement(
+                        cell.getX(), cell.getY(), SAFE_Z, cell.getTorque(),
+                        new MovementCallback() {
+                            @Override public void onSuccess() { /* handled in main sequence */ }
+                            @Override public void onFailure(String errorMessage) {
+                                if (callback != null) callback.onFailure("Failed to move up: " + errorMessage);
+                            }
+                            @Override public void onProgress(String status) {
+                                if (callback != null) callback.onProgress(status);
+                            }
+                        });
+
+                if (!moveUpFuture.get()) {
+                    if (callback != null) callback.onFailure("Failed to move up");
+                    controlGripper(false);
+                    return;
+                }
+
+                if (callback != null) callback.onSuccess();
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error in pickUpMarbleWithVerification: " + e.getMessage(), e);
+                if (callback != null) callback.onFailure("Error: " + e.getMessage());
             }
         });
     }
 
-    /**
-     * Puts a command in the queue for processing.
-     */
-    private void queueCommand(int cmdType) {
-        Command cmd = new Command(cmdType,
-                x.get(), y.get(), z.get(), t.get(), DEFAULT_SPEED);
-        commandQueue.offer(cmd);
-    }
+    public void placeMarbleWithVerification(CellCoordinate cell, MovementCallback callback) {
+        commandExecutor.submit(() -> {
+            try {
+                if (callback != null) callback.onProgress("Starting placement");
 
-    /**
-     * Actually executes a command by sending an HTTP request to the robot.
-     */
-    private void processCommand(Command cmd) {
-        isProcessing.set(true);
-        try {
-            String jsonCmd;
-            if (cmd.cmdType == 100) {
-                // e.g. reset command
-                jsonCmd = "{\"T\":100}";
-            } else {
-                // e.g. move or torque command
-                jsonCmd = String.format("{\"T\":%d,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f,\"spd\":%.2f}",
-                        cmd.cmdType, cmd.x, cmd.y, cmd.z, cmd.t, cmd.spd);
+                // Move overhead
+                CompletableFuture<Boolean> moveAboveFuture = executeVerifiedMovement(
+                        cell.getX(), cell.getY(), SAFE_Z, cell.getTorque(),
+                        new MovementCallback() {
+                            @Override public void onSuccess() { /* handled in main sequence */ }
+                            @Override public void onFailure(String errorMessage) {
+                                if (callback != null) callback.onFailure("Failed to move above: " + errorMessage);
+                            }
+                            @Override public void onProgress(String status) {
+                                if (callback != null) callback.onProgress(status);
+                            }
+                        });
+
+                if (!moveAboveFuture.get()) {
+                    if (callback != null) callback.onFailure("Failed to move above");
+                    return;
+                }
+
+                // Move down
+                CompletableFuture<Boolean> moveDownFuture = executeVerifiedMovement(
+                        cell.getX(), cell.getY(), cell.getZ(), cell.getTorque(),
+                        new MovementCallback() {
+                            @Override public void onSuccess() { /* handled in main sequence */ }
+                            @Override public void onFailure(String errorMessage) {
+                                if (callback != null) callback.onFailure("Failed to move down: " + errorMessage);
+                            }
+                            @Override public void onProgress(String status) {
+                                if (callback != null) callback.onProgress(status);
+                            }
+                        });
+
+                if (!moveDownFuture.get()) {
+                    if (callback != null) callback.onFailure("Failed to move down");
+                    controlGripper(false);
+                    return;
+                }
+
+                // Open gripper
+                if (callback != null) callback.onProgress("Opening gripper");
+                controlGripper(false);
+                Thread.sleep(1000);
+
+                // Move back up
+                CompletableFuture<Boolean> moveUpFuture = executeVerifiedMovement(
+                        cell.getX(), cell.getY(), SAFE_Z, cell.getTorque(),
+                        new MovementCallback() {
+                            @Override public void onSuccess() { /* handled in main sequence */ }
+                            @Override public void onFailure(String errorMessage) {
+                                if (callback != null) callback.onFailure("Failed to move up: " + errorMessage);
+                            }
+                            @Override public void onProgress(String status) {
+                                if (callback != null) callback.onProgress(status);
+                            }
+                        });
+
+                if (!moveUpFuture.get()) {
+                    if (callback != null) callback.onProgress("Warning: Failed to move up, but marble placed");
+                }
+
+                if (callback != null) callback.onSuccess();
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error in placeMarbleWithVerification: " + e.getMessage(), e);
+                if (callback != null) callback.onFailure("Error: " + e.getMessage());
             }
-
-            String urlString = "http://" + robotIp + "/js?json=" + jsonCmd;
-            sendHttpRequest(urlString);
-
-        } finally {
-            isProcessing.set(false);
-        }
+        });
     }
 
-    private void sendHttpRequest(String urlString) {
-        HttpURLConnection connection = null;
-        try {
-            URL url = new URL(urlString);
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(HTTP_TIMEOUT_MS);
-            connection.setReadTimeout(HTTP_TIMEOUT_MS);
+    public void executeCheckerMoveWithVerification(
+            CellCoordinate origin, CellCoordinate destination,
+            List<CellCoordinate> intermediatePoints, MovementCallback callback) {
 
-            int responseCode = connection.getResponseCode();
-            if (responseCode != HttpURLConnection.HTTP_OK) {
-                Log.w(TAG, "HTTP request failed with code: " + responseCode);
+        commandExecutor.submit(() -> {
+            try {
+                // Reset arm
+                if (callback != null) callback.onProgress("Resetting arm");
+                reset();
+                Thread.sleep(MOVEMENT_DELAY_MS);
+
+                // Pick up marble
+                if (callback != null) callback.onProgress("Picking up marble");
+
+                AtomicBoolean pickupSuccess = new AtomicBoolean(false);
+                CountDownLatch pickupLatch = new CountDownLatch(1);
+
+                pickUpMarbleWithVerification(origin, new MovementCallback() {
+                    @Override
+                    public void onSuccess() {
+                        pickupSuccess.set(true);
+                        pickupLatch.countDown();
+                    }
+
+                    @Override
+                    public void onFailure(String errorMessage) {
+                        if (callback != null) callback.onFailure("Pickup failed: " + errorMessage);
+                        pickupLatch.countDown();
+                    }
+
+                    @Override
+                    public void onProgress(String status) {
+                        if (callback != null) callback.onProgress(status);
+                    }
+                });
+
+                pickupLatch.await();
+
+                if (!pickupSuccess.get()) {
+                    return;
+                }
+
+                // Move through intermediate points
+                if (intermediatePoints != null && !intermediatePoints.isEmpty()) {
+                    if (callback != null) callback.onProgress("Moving through jump path");
+
+                    for (int i = 0; i < intermediatePoints.size(); i++) {
+                        CellCoordinate point = intermediatePoints.get(i);
+
+                        if (callback != null) {
+                            callback.onProgress("Moving to intermediate point " + (i+1) +
+                                    " of " + intermediatePoints.size());
+                        }
+
+                        CompletableFuture<Boolean> moveFuture = executeVerifiedMovement(
+                                point.getX(), point.getY(), SAFE_Z, point.getTorque(),
+                                new MovementCallback() {
+                                    @Override public void onSuccess() { /* handled in main sequence */ }
+                                    @Override public void onFailure(String errorMessage) {
+                                        if (callback != null) callback.onFailure("Failed at intermediate: " + errorMessage);
+                                    }
+                                    @Override public void onProgress(String status) {
+                                        if (callback != null) callback.onProgress(status);
+                                    }
+                                });
+
+                        if (!moveFuture.get()) {
+                            if (callback != null) callback.onFailure("Failed at intermediate point");
+                            controlGripper(false);
+                            return;
+                        }
+                    }
+                }
+
+                // Place marble at destination
+                if (callback != null) callback.onProgress("Placing marble");
+
+                AtomicBoolean placeSuccess = new AtomicBoolean(false);
+                CountDownLatch placeLatch = new CountDownLatch(1);
+
+                placeMarbleWithVerification(destination, new MovementCallback() {
+                    @Override
+                    public void onSuccess() {
+                        placeSuccess.set(true);
+                        placeLatch.countDown();
+                    }
+
+                    @Override
+                    public void onFailure(String errorMessage) {
+                        if (callback != null) callback.onFailure("Placement failed: " + errorMessage);
+                        placeLatch.countDown();
+                    }
+
+                    @Override
+                    public void onProgress(String status) {
+                        if (callback != null) callback.onProgress(status);
+                    }
+                });
+
+                placeLatch.await();
+
+                if (!placeSuccess.get()) {
+                    return;
+                }
+
+                if (callback != null) callback.onSuccess();
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error in executeCheckerMoveWithVerification: " + e.getMessage(), e);
+                if (callback != null) callback.onFailure("Error: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error sending command", e);
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
-        }
+        });
     }
 
-    // --------------------------
-    // Movement & Torque
-    // --------------------------
-
-    /**
-     * Move the robot to "home" position quickly.
-     */
-    public void reset() {
-        float homeX = 313.76f;
-        float homeY = 6.35f;
-        float homeZ = 233.32f;
-        float homeTorque = 3.13f;
-
-        // Update internal references
-        x.set(homeX);
-        y.set(homeY);
-        z.set(homeZ);
-        t.set(homeTorque);
-
-        // Enqueue a special command for reset
-        queueCommand(100);
-        Log.d(TAG, "Reset: Moving directly to home position");
-    }
-
-    /**
-     * 4-step "precision" sequence:
-     * 1) Move Z up to a safe height, keep XY
-     * 2) Adjust torque
-     * 3) Move XY over the target, keep safe Z
-     * 4) Lower Z to final
-     */
-    public void moveToWithPrecisionSequence(float targetX, float targetY, float targetZ, float targetTorque) {
-        float currentX = x.get();
-        float currentY = y.get();
-        float currentZ = z.get();
-        float currentTorque = t.get();
-
-        float safeZ = SAFE_Z;
-
-        // Step 1: rise to safe Z higher before adjusting torque
-        x.set(currentX);
-        y.set(currentY);
-        z.set(safeZ +20f);
-        t.set(currentTorque);
-        queueCommand(104);
-        Log.d(TAG, String.format("Step1: Move to safe Z=%.2f from (%.2f,%.2f,%.2f,%.2f)",
-                safeZ, currentX, currentY, currentZ, currentTorque));
-
-        // Step 2: adjust torque
-        mainHandler.postDelayed(() -> {
-            x.set(currentX);
-            y.set(currentY);
-            z.set(safeZ+20f);
-            t.set(targetTorque);
-            queueCommand(104);
-            Log.d(TAG, String.format("Step2: Adjust torque to %.2f at safeZ=%.2f", targetTorque, safeZ));
-
-            // Step 3: hover above final XY
-            mainHandler.postDelayed(() -> {
-                x.set(targetX);
-                y.set(targetY);
-                z.set(safeZ);
-                t.set(targetTorque);
-                queueCommand(104);
-                Log.d(TAG, String.format("Step3: Hover above (%.2f,%.2f) at Z=%.2f", targetX, targetY, safeZ));
-
-                // Step 4: go down to targetZ
-                mainHandler.postDelayed(() -> {
-                    x.set(targetX);
-                    y.set(targetY);
-                    z.set(targetZ);
-                    t.set(targetTorque);
-                    queueCommand(104);
-                    Log.d(TAG, String.format("Step4: Descend to (%.2f,%.2f,%.2f)", targetX, targetY, targetZ));
-                }, MOVEMENT_DELAY_MS);
-
-            }, MOVEMENT_DELAY_MS);
-        }, MOVEMENT_DELAY_MS);
-    }
-
-    // --------------------------
-    // Gripper control
-    // --------------------------
-
-    /**
-     * Controls the motorized gripper.
-     * @param close true = close, false = open
-     */
-    public void controlGripper(boolean close) {
-        String jsonCmd = close ? "{\"T\":116,\"cmd\":1}" : "{\"T\":116,\"cmd\":0}";
+    private void sendHttpCommand(String jsonCommand) {
         try {
-            URL url = new URL("http://" + robotIp + "/js?json=" + jsonCmd);
+            URL url = new URL("http://" + robotIp + "/js?json=" + jsonCommand);
             new Thread(() -> {
                 HttpURLConnection connection = null;
                 try {
@@ -290,13 +575,11 @@ public class RobotController {
                     connection.setReadTimeout(HTTP_TIMEOUT_MS);
 
                     int responseCode = connection.getResponseCode();
-                    if (responseCode == HttpURLConnection.HTTP_OK) {
-                        Log.d(TAG, close ? "Gripper closed" : "Gripper opened");
-                    } else {
-                        Log.e(TAG, "Failed to control gripper: code=" + responseCode);
+                    if (responseCode != HttpURLConnection.HTTP_OK) {
+                        Log.w(TAG, "HTTP request failed with code: " + responseCode);
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "Error controlling gripper", e);
+                    Log.e(TAG, "Error sending command: " + e.getMessage(), e);
                 } finally {
                     if (connection != null) {
                         connection.disconnect();
@@ -304,168 +587,7 @@ public class RobotController {
                 }
             }).start();
         } catch (MalformedURLException e) {
-            Log.e(TAG, "Malformed URL", e);
+            Log.e(TAG, "Malformed URL: " + e.getMessage(), e);
         }
-    }
-
-    // --------------------------
-    // High-Level "Pick and Place" Helpers
-    // --------------------------
-
-    /**
-     * Move above the cell at safe Z (hover).
-     */
-    public void moveAboveCell(CellCoordinate cell) {
-        // same torque, x,y from cell, z=SAFE_Z
-        float tx = cell.getX();
-        float ty = cell.getY();
-        float tt = cell.getTorque();
-        moveToWithPrecisionSequence(tx, ty, SAFE_Z, tt);
-    }
-
-    /**
-     * Move down close to the board for picking.
-     */
-    public void moveDownToPick(CellCoordinate cell) {
-        float tx = cell.getX();
-        float ty = cell.getY();
-        float tz = cell.getZ() + BOARD_OFFSET; // slightly above the board
-        float tt = cell.getTorque();
-        moveToWithPrecisionSequence(tx, ty, tz, tt);
-    }
-
-    /**
-     * Move down close to the board for placing a marble.
-     * (Could be the same as moveDownToPick, but a separate method for clarity.)
-     */
-    public void moveDownToPlace(CellCoordinate cell) {
-        float tx = cell.getX();
-        float ty = cell.getY();
-        float tz = cell.getZ() + BOARD_OFFSET;
-        float tt = cell.getTorque();
-        moveToWithPrecisionSequence(tx, ty, tz, tt);
-    }
-
-    /**
-     * Complete "pick up" sequence:
-     * 1) Move overhead
-     * 2) Move down
-     * 3) Close gripper
-     * 4) Move back up
-     */
-    public void pickUpMarble(CellCoordinate cell) {
-        new Thread(() -> {
-            try {
-                // Move overhead
-                moveAboveCell(cell);
-                Thread.sleep(MOVEMENT_DELAY_MS * 4); // Enough time for the 4-step sequence to finish
-
-                // Move down
-                moveDownToPick(cell);
-                Thread.sleep(MOVEMENT_DELAY_MS * 4);
-
-                // Close gripper
-                controlGripper(true);
-                Thread.sleep(1000);
-
-                // Move back up
-                moveAboveCell(cell);
-                Thread.sleep(MOVEMENT_DELAY_MS * 4);
-
-            } catch (InterruptedException e) {
-                Log.e(TAG, "pickUpMarble interrupted", e);
-                Thread.currentThread().interrupt();
-            }
-        }).start();
-    }
-
-    /**
-     * Complete "place" sequence:
-     * 1) Move overhead
-     * 2) Move down
-     * 3) Open gripper
-     * 4) Move back up
-     */
-    public void placeMarble(CellCoordinate cell) {
-        new Thread(() -> {
-            try {
-                // Move overhead
-                moveAboveCell(cell);
-                Thread.sleep(MOVEMENT_DELAY_MS * 4);
-
-                // Move down
-                moveDownToPlace(cell);
-                Thread.sleep(MOVEMENT_DELAY_MS * 4);
-
-                // Open gripper
-                controlGripper(false);
-                Thread.sleep(1000);
-
-                // Move back up
-                moveAboveCell(cell);
-                Thread.sleep(MOVEMENT_DELAY_MS * 4);
-
-            } catch (InterruptedException e) {
-                Log.e(TAG, "placeMarble interrupted", e);
-                Thread.currentThread().interrupt();
-            }
-        }).start();
-    }
-
-    // --------------------------
-    // Multi-step Move Example
-    // --------------------------
-
-    /**
-     * Demonstrates picking up from origin, optionally passing through intermediate
-     * jump points, then placing at destination.
-     */
-    public void executeCheckerMove(CellCoordinate origin,
-                                   CellCoordinate destination,
-                                   List<CellCoordinate> intermediatePoints) {
-
-        new Thread(() -> {
-            try {
-                // 1) Move above origin -> go down -> close
-                moveAboveCell(origin);
-                Thread.sleep(MOVEMENT_DELAY_MS * 4);
-
-                moveDownToPick(origin);
-                Thread.sleep(MOVEMENT_DELAY_MS * 4);
-
-                controlGripper(true);
-                Thread.sleep(1500);
-
-                // 2) Go back up
-                moveAboveCell(origin);
-                Thread.sleep(MOVEMENT_DELAY_MS * 4);
-
-                // 3) Intermediate points (chain jumps)
-                if (intermediatePoints != null && !intermediatePoints.isEmpty()) {
-                    for (CellCoordinate point : intermediatePoints) {
-                        moveAboveCell(point);
-                        Thread.sleep(MOVEMENT_DELAY_MS * 4);
-                    }
-                }
-
-                // 4) Move above destination -> go down -> open
-                moveAboveCell(destination);
-                Thread.sleep(MOVEMENT_DELAY_MS * 4);
-
-                moveDownToPlace(destination);
-                Thread.sleep(MOVEMENT_DELAY_MS * 4);
-
-                controlGripper(false);
-                Thread.sleep(1500);
-
-                // 5) Go back up from final
-                moveAboveCell(destination);
-                Thread.sleep(MOVEMENT_DELAY_MS * 4);
-
-            } catch (InterruptedException e) {
-                Log.e(TAG, "executeCheckerMove interrupted: " + e.getMessage(), e);
-                Thread.currentThread().interrupt();
-            }
-        }).start();
     }
 }
