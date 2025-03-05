@@ -18,7 +18,7 @@ public class BoardCoordinatesAdapter {
     private static final float centralCoordinateY = 0f;
     private static final float centralCoordinateZ = -110f;
     private static final float centralCoordinateTorque = 1.9f;
-    private static final float xDis = 25.5f;
+    private static final float xDis = 26f;
     // Singleton instance
     private static BoardCoordinatesAdapter instance;
 
@@ -74,7 +74,7 @@ public class BoardCoordinatesAdapter {
         // Row 0 (1 cell) => offset=6 => boardX=6
         // TILES_PER_ROW[0] = 1
         // ---------------------------
-        addMapping(centralX-4, centralY-8,
+        addMapping(0, centralY-8,
                 /*gridX*/ 12, /*gridY*/ 0,
                 /*x*/ centralCoordinateX+xDis*8, /*y*/ centralCoordinateY, /*z*/ centralCoordinateZ-25f,
                 centralCoordinateTorque+0.35f);
@@ -87,12 +87,12 @@ public class BoardCoordinatesAdapter {
         // Row 1 (2 cells) => offset=5 => boardX=5..6
         // TILES_PER_ROW[1] = 2
         // ---------------------------
-        addMapping(centralX-4, centralY-7,
+        addMapping(0, centralY-7,
                 /*gridX*/ 11, /*gridY*/ 1,
                 /*x*/ centralCoordinateX+xDis*7, /*y*/ centralCoordinateY+12.5f, /*z*/ centralCoordinateZ-20f,
                 centralCoordinateTorque+0.3f);
 
-        addMapping(centralX-3, centralY-7,
+        addMapping(1, centralY-7,
                 /*gridX*/ 13, /*gridY*/ 1,
                 /*x*/ centralCoordinateX+xDis*7, /*y*/ centralCoordinateY-12.5f, /*z*/ centralCoordinateZ-20f,
                 centralCoordinateTorque+0.3f);
@@ -109,17 +109,17 @@ public class BoardCoordinatesAdapter {
         // Row 2 (3 cells) => offset=4 => boardX=4..6
         // TILES_PER_ROW[2] = 3
         // ---------------------------
-        addMapping(centralX-4, centralY-6,
+        addMapping(0, centralY-6,
                 /*gridX*/ 10, /*gridY*/ 2,
                 /*x*/ centralCoordinateX+xDis*6, /*y*/ centralCoordinateY+25.0f, /*z*/ centralCoordinateZ-15f,
                 centralCoordinateTorque+0.25f);
 
-        addMapping(centralX-3, centralY-6,
+        addMapping(1, centralY-6,
                 /*gridX*/ 12, /*gridY*/ 2,
                 /*x*/ centralCoordinateX+xDis*6, /*y*/ centralCoordinateY, /*z*/ centralCoordinateZ-15f,
                 centralCoordinateTorque+0.25f);
 
-        addMapping(centralX-2, centralY-6,
+        addMapping(2, centralY-6,
                 /*gridX*/ 14, /*gridY*/ 2,
                 /*x*/ centralCoordinateX+xDis*6, /*y*/ centralCoordinateY-25.0f, /*z*/ centralCoordinateZ-15f,
                 centralCoordinateTorque+0.25f);
@@ -143,7 +143,7 @@ public class BoardCoordinatesAdapter {
         for (int bx = 0; bx <= 1; bx++) {
             addMapping(bx, 3,
                     /*gridX*/ 9+bx*2, /*gridY*/ 3,
-                    /*x*/ centralCoordinateX+xDis*5, /*y*/ centralCoordinateY+12.5f+25.0f *(2-bx), /*z*/ centralCoordinateZ-10f,
+                    /*x*/ centralCoordinateX+xDis*5, /*y*/ centralCoordinateY+12.5f+25.0f *(1-bx), /*z*/ centralCoordinateZ-10f,
                     centralCoordinateTorque+0.2f);
         }
 
@@ -443,7 +443,7 @@ public class BoardCoordinatesAdapter {
         for (int bx = 0; bx <= 1; bx++) {
             addMapping(bx, 13,
                     /*gridX*/ 9+bx*2, /*gridY*/ 13,
-                    /*x*/ centralCoordinateX-xDis*5, /*y*/ centralCoordinateY+12.5f+25.0f *(2-bx), /*z*/ centralCoordinateZ+10f,
+                    /*x*/ centralCoordinateX-xDis*5, /*y*/ centralCoordinateY+12.5f+25.0f *(1-bx), /*z*/ centralCoordinateZ+10f,
                     centralCoordinateTorque-0.2f);
         }
 
@@ -475,17 +475,17 @@ public class BoardCoordinatesAdapter {
         // Row 14 (3 cells) => offset=4 => boardX=4..6
         // TILES_PER_ROW[14] = 3
         // --------------------------------------------------
-        addMapping(centralX-4, centralY+6,
+        addMapping(0, centralY+6,
                 /*gridX*/ 10, /*gridY*/ 14,
                 /*x*/ centralCoordinateX-xDis*6, /*y*/ centralCoordinateY+25.0f, /*z*/ centralCoordinateZ+15f,
                 centralCoordinateTorque-0.25f);
 
-        addMapping(centralX-3, centralY+6,
+        addMapping(1, centralY+6,
                 /*gridX*/ 12, /*gridY*/ 14,
                 /*x*/ centralCoordinateX-xDis*6, /*y*/ centralCoordinateY, /*z*/ centralCoordinateZ+15f,
                 centralCoordinateTorque-0.25f);
 
-        addMapping(centralX-2, centralY+6,
+        addMapping(2, centralY+6,
                 /*gridX*/ 14, /*gridY*/ 14,
                 /*x*/ centralCoordinateX-xDis*6, /*y*/ centralCoordinateY-25.0f, /*z*/ centralCoordinateZ+15f,
                 centralCoordinateTorque-0.25f);
@@ -506,12 +506,12 @@ public class BoardCoordinatesAdapter {
         // Row 15 (2 cells) => offset=5 => boardX=5..6
         // TILES_PER_ROW[15] = 2
         // --------------------------------------------------
-        addMapping(centralX-4, centralY+7,
+        addMapping(0, centralY+7,
                 /*gridX*/ 11, /*gridY*/ 15,
                 /*x*/ centralCoordinateX-xDis*7, /*y*/ centralCoordinateY+12.5f, /*z*/ centralCoordinateZ+20f,
                 centralCoordinateTorque-0.3f);
 
-        addMapping(centralX-3, centralY+7,
+        addMapping(1, centralY+7,
                 /*gridX*/ 13, /*gridY*/ 15,
                 /*x*/ centralCoordinateX-xDis*7, /*y*/ centralCoordinateY-12.5f, /*z*/ centralCoordinateZ+20f,
                 centralCoordinateTorque-0.3f);
@@ -529,7 +529,7 @@ public class BoardCoordinatesAdapter {
         // Row 16 (1 cell) => offset=6 => boardX=6
         // TILES_PER_ROW[16] = 1
         // --------------------------------------------------
-        addMapping(centralX-4, centralY+8,
+        addMapping(0, centralY+8,
                 /*gridX*/ 12, /*gridY*/ 16,
                 /*x*/ centralCoordinateX-xDis*8, /*y*/ centralCoordinateY, /*z*/ centralCoordinateZ+25f,
                 centralCoordinateTorque-0.35f);

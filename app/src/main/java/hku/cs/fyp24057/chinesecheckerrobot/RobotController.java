@@ -458,7 +458,7 @@ public class RobotController {
                 // Reset arm
                 if (callback != null) callback.onProgress("Resetting arm");
                 reset();
-                Thread.sleep(MOVEMENT_DELAY_MS);
+                Thread.sleep(2000);
 
                 // Pick up marble
                 if (callback != null) callback.onProgress("Picking up marble");

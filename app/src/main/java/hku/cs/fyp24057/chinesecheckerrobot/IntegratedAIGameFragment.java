@@ -81,7 +81,7 @@ public class IntegratedAIGameFragment extends Fragment {
     private boolean hasEmptyBoard = false;
 
     // Network Clients
-    private String serverIp = "192.168.11.230"; // Default
+    private String serverIp = "192.168.11.175"; // Default
     private String robotIp = "192.168.11.172"; // Default
     private OkHttpClient client;
     private BoardDetectionClient detectionClient;
@@ -669,11 +669,12 @@ public class IntegratedAIGameFragment extends Fragment {
         }
     }
 
-    /**
-     * Execute a move sequence from the AI recommendations using the improved RobotController
-     * @param moveSequence JSONArray of coordinates from the AI
-     */
     private void executeAIMoveSequence(JSONArray moveSequence) {
+        Log.d(TAG, "executeAIMoveSequence called");
+
+        // Show immediate feedback
+        Toast.makeText(requireContext(), "Executing AI move...", Toast.LENGTH_SHORT).show();
+
         if (moveSequence == null || moveSequence.length() < 2) {
             Toast.makeText(requireContext(), "Invalid move sequence", Toast.LENGTH_SHORT).show();
             return;
@@ -684,93 +685,93 @@ public class IntegratedAIGameFragment extends Fragment {
         tvAIResponse.append("\n\nExecuting move sequence...");
 
         try {
+            // Set moving flag
+            isMoving = true;
+
             // Step 1: Convert JSON array of board coordinates into CellCoordinates
             List<CellCoordinate> path = new ArrayList<>();
             for (int i = 0; i < moveSequence.length(); i++) {
-                JSONObject coordObj = moveSequence.getJSONObject(i);
-                int boardX = coordObj.getInt("x");
-                int boardY = coordObj.getInt("y");
+                try {
+                    JSONObject coordObj = moveSequence.getJSONObject(i);
+                    int boardX = coordObj.getInt("x");
+                    int boardY = coordObj.getInt("y");
 
-                // Convert board coords -> robot coords
-                CellCoordinate cellCoord = BoardCoordinatesAdapter.getInstance()
-                        .getBoardCellCoordinate(boardX, boardY);
-                if (cellCoord == null) {
-                    Log.e(TAG, "No mapping for board coords (" + boardX + "," + boardY + ")");
-                    continue;
+                    Log.d(TAG, "Processing board coordinates: (" + boardX + "," + boardY + ")");
+
+                    // Convert board coords -> robot coords
+                    CellCoordinate cellCoord = BoardCoordinatesAdapter.getInstance()
+                            .getBoardCellCoordinate(boardX, boardY);
+
+                    if (cellCoord == null) {
+                        Log.e(TAG, "No mapping for board coords (" + boardX + "," + boardY + ")");
+                        continue;
+                    }
+
+                    path.add(cellCoord);
+                    Log.d(TAG, "Added cell coordinate: (" + cellCoord.getGridX() + "," +
+                            cellCoord.getGridY() + ") at robot position (X=" + cellCoord.getX() +
+                            ", Y=" + cellCoord.getY() + ", Z=" + cellCoord.getZ() + ")");
+                } catch (JSONException e) {
+                    Log.e(TAG, "Error parsing coordinate at index " + i, e);
                 }
-                path.add(cellCoord);
             }
 
             if (path.size() < 2) {
                 requireActivity().runOnUiThread(() -> {
+                    isMoving = false;
                     btnExecuteMove.setEnabled(true);
+                    tvAIResponse.append("\nError: Could not create a valid path with at least 2 points");
                     Toast.makeText(requireContext(), "Invalid path from AI", Toast.LENGTH_SHORT).show();
+
                 });
                 return;
             }
 
             // Log the path for debugging
-            StringBuilder pathInfo = new StringBuilder("Path: ");
-            for (CellCoordinate coord : path) {
-                pathInfo.append(String.format("(%.1f,%.1f) ", coord.getX(), coord.getY()));
+            tvAIResponse.append("\nPath created with " + path.size() + " points");
+
+            // Reset the arm first for safety
+            tvAIResponse.append("\nResetting arm position...");
+            robotController.reset();
+
+            // Wait for reset to complete
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
-            Log.d(TAG, pathInfo.toString());
 
-            // Set moving flag
-            isMoving = true;
-
-            // Get origin and destination
-            CellCoordinate origin = path.get(0);
-            CellCoordinate destination = path.get(path.size() - 1);
-
-            // Create intermediate points list (all but first and last)
-            List<CellCoordinate> intermediatePoints = null;
-            if (path.size() > 2) {
-                intermediatePoints = new ArrayList<>();
-                for (int i = 1; i < path.size() - 1; i++) {
-                    intermediatePoints.add(path.get(i));
+            // Execute the move with marble handling
+            new Thread(() -> {
+                try {
+                    boolean success = executeMove(path);
+                    requireActivity().runOnUiThread(() -> {
+                        isMoving = false;
+                        btnExecuteMove.setEnabled(true);
+                        if (success) {
+                            tvAIResponse.append("\nMove sequence completed successfully!");
+                            Toast.makeText(requireContext(),
+                                    "Move sequence completed successfully",
+                                    Toast.LENGTH_SHORT).show();
+                        } else {
+                            tvAIResponse.append("\nMove sequence failed.");
+                            Toast.makeText(requireContext(),
+                                    "Move sequence failed",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in move thread", e);
+                    requireActivity().runOnUiThread(() -> {
+                        isMoving = false;
+                        btnExecuteMove.setEnabled(true);
+                        tvAIResponse.append("\nError: " + e.getMessage());
+                        Toast.makeText(requireContext(),
+                                "Error: " + e.getMessage(),
+                                Toast.LENGTH_SHORT).show();
+                    });
                 }
-            }
-
-            // Use the improved robot controller to execute the move sequence
-            robotController.executeCheckerMoveWithVerification(
-                    origin, destination, intermediatePoints,
-                    new RobotController.MovementCallback() {
-                        @Override
-                        public void onSuccess() {
-                            requireActivity().runOnUiThread(() -> {
-                                isMoving = false;
-                                btnExecuteMove.setEnabled(true);
-                                tvAIResponse.append("\nMove sequence completed successfully!");
-                                Toast.makeText(requireContext(),
-                                        "Move sequence completed successfully",
-                                        Toast.LENGTH_SHORT).show();
-
-                                // Re-detect the board state after successful move
-//                                btnDetectCurrent.performClick();
-                            });
-                        }
-
-                        @Override
-                        public void onFailure(String errorMessage) {
-                            requireActivity().runOnUiThread(() -> {
-                                isMoving = false;
-                                btnExecuteMove.setEnabled(true);
-                                tvAIResponse.append("\nMove failed: " + errorMessage);
-                                Toast.makeText(requireContext(),
-                                        "Movement failed: " + errorMessage,
-                                        Toast.LENGTH_SHORT).show();
-                            });
-                        }
-
-                        @Override
-                        public void onProgress(String status) {
-                            requireActivity().runOnUiThread(() -> {
-                                tvAIResponse.append("\n" + status);
-                            });
-                        }
-                    }
-            );
+            }).start();
 
         } catch (Exception e) {
             Log.e(TAG, "Error executing AI move sequence", e);
@@ -783,6 +784,203 @@ public class IntegratedAIGameFragment extends Fragment {
                         Toast.LENGTH_SHORT).show();
             });
         }
+    }
+
+    /**
+     * Execute a complete move with marble handling
+     * @param path List of coordinates representing the move path
+     * @return true if successful, false if any step fails
+     */
+    private boolean executeMove(List<CellCoordinate> path) {
+        // Constants for move parameters
+        final int MAX_RETRIES = 3;
+        final int RETRY_DELAY_MS = 2000;
+        final int MOVEMENT_WAIT_MS = 5000;
+        final int GRIPPER_WAIT_MS = 3000;
+        final float SAFE_Z = -60f;
+
+        // Get origin and destination
+        CellCoordinate origin = path.get(0);
+        CellCoordinate destination = path.get(path.size() - 1);
+
+        try {
+            // Step 1: Move to a safe position above the origin
+            updateProgress("Moving above origin piece");
+            if (!moveWithRetry(origin.getX(), origin.getY(), SAFE_Z, origin.getTorque(),
+                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+                updateProgress("Failed to move above origin");
+                return false;
+            }
+
+            // Step 2: Move down to the piece
+            updateProgress("Moving down to pick up piece");
+            if (!moveWithRetry(origin.getX(), origin.getY(), origin.getZ(), origin.getTorque(),
+                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+                updateProgress("Failed to move down to piece");
+                return false;
+            }
+
+            // Step 3: Close gripper to grab piece
+            updateProgress("Closing gripper to grab piece");
+            robotController.controlGripper(true);
+            Thread.sleep(GRIPPER_WAIT_MS);
+
+            // Step 4: Lift piece to safe height
+            updateProgress("Lifting piece");
+            if (!moveWithRetry(origin.getX(), origin.getY(), SAFE_Z, origin.getTorque(),
+                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+                updateProgress("Failed to lift piece");
+                // Release grip in case of failure
+                robotController.controlGripper(false);
+                return false;
+            }
+
+            // Step 5: Move through any intermediate points if they exist
+            if (path.size() > 2) {
+                for (int i = 1; i < path.size() - 1; i++) {
+                    CellCoordinate intermediate = path.get(i);
+                    updateProgress("Moving through position " + (i+1) + " of " + path.size());
+
+                    if (!moveWithRetry(intermediate.getX(), intermediate.getY(), SAFE_Z,
+                            intermediate.getTorque(), MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+                        updateProgress("Failed to move through intermediate position " + (i+1));
+                        // Release grip in case of failure
+                        robotController.controlGripper(false);
+                        return false;
+                    }
+                }
+            }
+
+            // Step 6: Move to position above destination
+            updateProgress("Moving above destination");
+            if (!moveWithRetry(destination.getX(), destination.getY(), SAFE_Z, destination.getTorque(),
+                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+                updateProgress("Failed to move above destination");
+                // Release grip in case of failure
+                robotController.controlGripper(false);
+                return false;
+            }
+
+            // Step 7: Lower piece to final position
+            updateProgress("Lowering piece to destination");
+            if (!moveWithRetry(destination.getX(), destination.getY(), destination.getZ(),
+                    destination.getTorque(), MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+                updateProgress("Failed to lower piece to destination");
+                // Release grip anyway to drop piece
+                robotController.controlGripper(false);
+                return false;
+            }
+
+            // Step 8: Open gripper to release piece
+            updateProgress("Opening gripper to release piece");
+            robotController.controlGripper(false);
+            Thread.sleep(GRIPPER_WAIT_MS);
+
+            // Step 9: Lift arm back to safe height
+            updateProgress("Lifting arm from destination");
+            if (!moveWithRetry(destination.getX(), destination.getY(), SAFE_Z, destination.getTorque(),
+                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+                updateProgress("Failed to lift arm from destination (but piece was placed)");
+                // Not a critical failure as the piece was placed
+                return true;
+            }
+
+            // Step 10: Return to home position
+            updateProgress("Returning to home position");
+            robotController.reset();
+            Thread.sleep(MOVEMENT_WAIT_MS);
+
+            return true;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error during move execution", e);
+            updateProgress("Error: " + e.getMessage());
+            // Try to release grip in case of exception
+            try {
+                robotController.controlGripper(false);
+            } catch (Exception ex) {
+                Log.e(TAG, "Error releasing gripper", ex);
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Helper method for movement with retry logic
+     */
+    /**
+     * Helper method for movement with retry logic
+     */
+    private boolean moveWithRetry(float x, float y, float z, float torque,
+                                  int maxRetries, int retryDelayMs, int waitTimeMs) {
+        // Set position tolerance to 3mm (expressed in robot units)
+        final float POSITION_TOLERANCE = 10.0f;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                if (attempt > 1) {
+                    updateProgress("Retry attempt " + attempt + " of " + maxRetries);
+                }
+
+                // Send the movement command
+                robotController.moveTo(x, y, z, torque);
+
+                // Wait for movement to complete
+                Thread.sleep(waitTimeMs);
+
+                // Check position feedback
+                JSONObject feedback = robotController.getPositionFeedback();
+                if (feedback != null) {
+                    float currentX = (float) feedback.getDouble("x");
+                    float currentY = (float) feedback.getDouble("y");
+                    float currentZ = (float) feedback.getDouble("z");
+
+                    boolean isPositionCorrect =
+                            Math.abs(currentX - x) <= POSITION_TOLERANCE &&
+                                    Math.abs(currentY - y) <= POSITION_TOLERANCE &&
+                                    Math.abs(currentZ - z) <= POSITION_TOLERANCE;
+
+                    if (isPositionCorrect) {
+                        return true;
+                    } else {
+                        updateProgress(String.format("Position not reached. Target(%.1f,%.1f,%.1f) Current(%.1f,%.1f,%.1f) Tolerance: %.1f",
+                                x, y, z, currentX, currentY, currentZ, POSITION_TOLERANCE));
+                    }
+                } else {
+                    updateProgress("Could not get position feedback");
+                }
+
+                // If we're here, position wasn't reached - wait before retry
+                if (attempt < maxRetries) {
+                    Thread.sleep(retryDelayMs);
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error during move attempt " + attempt, e);
+                updateProgress("Error: " + e.getMessage());
+
+                try {
+                    if (attempt < maxRetries) {
+                        Thread.sleep(retryDelayMs);
+                    }
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+        }
+
+        return false;  // All retries failed
+    }
+
+    /**
+     * Update progress on the UI thread
+     */
+    private void updateProgress(String message) {
+        Log.d(TAG, message);
+        requireActivity().runOnUiThread(() -> {
+            tvAIResponse.append("\n" + message);
+        });
     }
 
     private void startCamera() {
