@@ -30,7 +30,7 @@ public class RobotController {
 
     // Settings
     private static final int HTTP_TIMEOUT_MS = 1000;
-    private static final float DEFAULT_SPEED = 0.25f;  // Speed setting
+    private static final float DEFAULT_SPEED = 1.00f;  // Speed setting
     private static final int MOVEMENT_DELAY_MS = 5000;
     private static final int SHORT_DELAY_MS = 5000;
     private static final float DEFAULT_POSITION_TOLERANCE = 5.0f;
