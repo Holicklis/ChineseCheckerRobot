@@ -76,7 +76,7 @@ public class BoardCoordinatesAdapter {
         // ---------------------------
         addMapping(0, centralY-8,
                 /*gridX*/ 12, /*gridY*/ 0,
-                /*x*/ centralCoordinateX+xDis*8, /*y*/ centralCoordinateY, /*z*/ centralCoordinateZ-25f,
+                /*x*/ centralCoordinateX+xDis*8+20f, /*y*/ centralCoordinateY+3f, /*z*/ centralCoordinateZ-25f,
                 centralCoordinateTorque+0.35f);
 //        addMapping(6, 0,
 //                /*gridX*/ 0, /*gridY*/ 0,
@@ -288,6 +288,8 @@ public class BoardCoordinatesAdapter {
                     /*x*/ centralCoordinateX, /*y*/ centralCoordinateY+23.0f *(4-bx), /*z*/ centralCoordinateZ,
                     centralCoordinateTorque);
         }
+
+
         addMapping(centralX, centralY, //4,8
                 /*gridX*/ 12, /*gridY*/ 8,
                 /*x*/ centralCoordinateX, /*y*/ centralCoordinateY, /*z*/ centralCoordinateZ,
@@ -440,19 +442,39 @@ public class BoardCoordinatesAdapter {
         // Row 13 (4 cells) => offset=3 => boardX=3..6
         // TILES_PER_ROW[13] = 4
         // --------------------------------------------------
-        for (int bx = 0; bx <= 1; bx++) {
-            addMapping(bx, 13,
-                    /*gridX*/ 9+bx*2, /*gridY*/ 13,
-                    /*x*/ centralCoordinateX-xDis*5, /*y*/ centralCoordinateY+12.5f+25.0f *(1-bx), /*z*/ centralCoordinateZ+10f,
-                    centralCoordinateTorque-0.2f);
-        }
+//        for (int bx = 0; bx <= 1; bx++) {
+//            addMapping(bx, 13,
+//                    /*gridX*/ 9+bx*2, /*gridY*/ 13,
+//                    /*x*/ centralCoordinateX-xDis*5, /*y*/ centralCoordinateY+25.0f *(1-bx), /*z*/ centralCoordinateZ+10f,
+//                    centralCoordinateTorque-0.2f);
+//        }
 
-        for (int bx = 2; bx <= 3; bx++) {
-            addMapping(bx, 13,
-                    /*gridX*/ 13+(bx-2)*2, /*gridY*/ 13,
-                    /*x*/ centralCoordinateX-xDis*5, /*y*/ centralCoordinateY-12.5f-25.0f *(bx-2), /*z*/ centralCoordinateZ+10f,
-                    centralCoordinateTorque-0.2f);
-        }
+        addMapping(0, 13,
+                /*gridX*/ 9, /*gridY*/ 13,
+                /*x*/ centralCoordinateX-xDis*5, /*y*/ centralCoordinateY+25.0f, /*z*/ centralCoordinateZ+10f,
+                centralCoordinateTorque-0.2f);
+
+        addMapping(1, 13,
+                /*gridX*/ 11, /*gridY*/ 13,
+                /*x*/ centralCoordinateX-xDis*5-2f, /*y*/ centralCoordinateY+7.0f, /*z*/ centralCoordinateZ+10f,
+                centralCoordinateTorque-0.2f);
+
+//        for (int bx = 2; bx <= 3; bx++) {
+//            addMapping(bx, 13,
+//                    /*gridX*/ 13+(bx-2)*2, /*gridY*/ 13,
+//                    /*x*/ centralCoordinateX-xDis*5, /*y*/ centralCoordinateY-12.5f-25.0f *(bx-2), /*z*/ centralCoordinateZ+10f,
+//                    centralCoordinateTorque-0.2f);
+//        }
+
+        addMapping(2, 13,
+                /*gridX*/ 13, /*gridY*/ 13,
+                /*x*/ centralCoordinateX-xDis*5, /*y*/ centralCoordinateY-12.5f, /*z*/ centralCoordinateZ+10f,
+                centralCoordinateTorque-0.2f);
+
+        addMapping(3, 13,
+                /*gridX*/ 15, /*gridY*/ 13,
+                /*x*/ centralCoordinateX-xDis*5-1f, /*y*/ centralCoordinateY-31f, /*z*/ centralCoordinateZ+10f,
+                centralCoordinateTorque-0.2f);
 
 //        addMapping(3, 13,
 //                /*gridX*/ 0, /*gridY*/ 13,
@@ -477,17 +499,17 @@ public class BoardCoordinatesAdapter {
         // --------------------------------------------------
         addMapping(0, centralY+6,
                 /*gridX*/ 10, /*gridY*/ 14,
-                /*x*/ centralCoordinateX-xDis*6, /*y*/ centralCoordinateY+25.0f, /*z*/ centralCoordinateZ+15f,
+                /*x*/ centralCoordinateX-xDis*6-2f, /*y*/ centralCoordinateY+10f, /*z*/ centralCoordinateZ+15f,
                 centralCoordinateTorque-0.25f);
 
         addMapping(1, centralY+6,
                 /*gridX*/ 12, /*gridY*/ 14,
-                /*x*/ centralCoordinateX-xDis*6, /*y*/ centralCoordinateY, /*z*/ centralCoordinateZ+15f,
+                /*x*/ centralCoordinateX-xDis*6-2f, /*y*/ centralCoordinateY-3f, /*z*/ centralCoordinateZ+15f,
                 centralCoordinateTorque-0.25f);
 
         addMapping(2, centralY+6,
                 /*gridX*/ 14, /*gridY*/ 14,
-                /*x*/ centralCoordinateX-xDis*6, /*y*/ centralCoordinateY-25.0f, /*z*/ centralCoordinateZ+15f,
+                /*x*/ centralCoordinateX-xDis*6-2f, /*y*/ centralCoordinateY-18.0f, /*z*/ centralCoordinateZ+15f,
                 centralCoordinateTorque-0.25f);
 //        addMapping(4, 14,
 //                /*gridX*/ 0, /*gridY*/ 14,
@@ -508,12 +530,12 @@ public class BoardCoordinatesAdapter {
         // --------------------------------------------------
         addMapping(0, centralY+7,
                 /*gridX*/ 11, /*gridY*/ 15,
-                /*x*/ centralCoordinateX-xDis*7, /*y*/ centralCoordinateY+12.5f, /*z*/ centralCoordinateZ+20f,
+                /*x*/ centralCoordinateX-xDis*7-3f, /*y*/ centralCoordinateY+2f, /*z*/ centralCoordinateZ+22f,
                 centralCoordinateTorque-0.3f);
 
         addMapping(1, centralY+7,
                 /*gridX*/ 13, /*gridY*/ 15,
-                /*x*/ centralCoordinateX-xDis*7, /*y*/ centralCoordinateY-12.5f, /*z*/ centralCoordinateZ+20f,
+                /*x*/ centralCoordinateX-xDis*7-3f, /*y*/ centralCoordinateY-11f, /*z*/ centralCoordinateZ+22f,
                 centralCoordinateTorque-0.3f);
 
 //        addMapping(5, 15,
@@ -531,8 +553,8 @@ public class BoardCoordinatesAdapter {
         // --------------------------------------------------
         addMapping(0, centralY+8,
                 /*gridX*/ 12, /*gridY*/ 16,
-                /*x*/ centralCoordinateX-xDis*8-15 , /*y*/ centralCoordinateY-5, /*z*/ centralCoordinateZ+30f,
-                centralCoordinateTorque-0.5f);
+                /*x*/ centralCoordinateX-xDis*8-10f , /*y*/ centralCoordinateY-4.5f, /*z*/ centralCoordinateZ+30f,
+                centralCoordinateTorque-0.45f);
 
 //        addMapping(6, 16,
 //                /*gridX*/ 0, /*gridY*/ 16,

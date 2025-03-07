@@ -36,7 +36,7 @@ public class RobotController {
     private static final float DEFAULT_POSITION_TOLERANCE = 2.0f;
     private static final int DEFAULT_MAX_RETRIES = 5;
     private static final int VERIFICATION_DELAY_MS = 500;
-    private static final float SAFE_Z = -60f;
+    private static final float SAFE_Z = -70f;
 
     private String robotIp = "192.168.11.172";
     private OkHttpClient httpClient;
@@ -118,7 +118,7 @@ public class RobotController {
 
         // Step 1: rise to safe Z first (keep XY unchanged)
         String jsonCmd1 = String.format("{\"T\":104,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f,\"spd\":%.2f}",
-                currentX, currentY, safeZ + 20f, currentTorque, DEFAULT_SPEED);
+                currentX, currentY, safeZ, currentTorque, DEFAULT_SPEED);
         sendHttpCommand(jsonCmd1);
         Log.d(TAG, "Step1: Move to safe Z (keeping current XY)");
 
@@ -130,7 +130,7 @@ public class RobotController {
 
         // Step 2: adjust torque
         String jsonCmd2 = String.format("{\"T\":104,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f,\"spd\":%.2f}",
-                currentX, currentY, safeZ + 20f, targetTorque, DEFAULT_SPEED);
+                currentX, currentY, safeZ, targetTorque, DEFAULT_SPEED);
         sendHttpCommand(jsonCmd2);
         Log.d(TAG, "Step2: Adjust torque");
 
