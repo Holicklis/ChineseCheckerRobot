@@ -15,7 +15,7 @@ public class BoardCoordinatesAdapter {
     private static final int centralY  = 8;
 
     private static final float centralCoordinateX = 240f;
-    private static final float centralCoordinateY = 0f;
+    private static final float centralCoordinateY = 5f;
     private static final float centralCoordinateZ = -110f;
     private static final float centralCoordinateTorque = 1.9f;
     private static final float xDis = 26f;
@@ -285,7 +285,7 @@ public class BoardCoordinatesAdapter {
         for (int bx = 0; bx <= 3; bx++) {
             addMapping(bx, 8,
                     /*gridX*/ 4+bx*2, /*gridY*/ 8,
-                    /*x*/ centralCoordinateX, /*y*/ centralCoordinateY+25.0f *(4-bx), /*z*/ centralCoordinateZ,
+                    /*x*/ centralCoordinateX, /*y*/ centralCoordinateY+23.0f *(4-bx), /*z*/ centralCoordinateZ,
                     centralCoordinateTorque);
         }
         addMapping(centralX, centralY, //4,8
@@ -297,7 +297,7 @@ public class BoardCoordinatesAdapter {
         for (int bx = 5; bx <= 8; bx++) {
             addMapping(bx, 8,
                     /*gridX*/ 4+(bx-4)*2, /*gridY*/ 8,
-                    /*x*/ centralCoordinateX, /*y*/ centralCoordinateY-25.0f *(bx-4), /*z*/ centralCoordinateZ,
+                    /*x*/ centralCoordinateX+10f, /*y*/ centralCoordinateY-23.0f *(bx-4), /*z*/ centralCoordinateZ,
                     centralCoordinateTorque);
         }
 
@@ -531,8 +531,8 @@ public class BoardCoordinatesAdapter {
         // --------------------------------------------------
         addMapping(0, centralY+8,
                 /*gridX*/ 12, /*gridY*/ 16,
-                /*x*/ centralCoordinateX-xDis*8, /*y*/ centralCoordinateY, /*z*/ centralCoordinateZ+25f,
-                centralCoordinateTorque-0.35f);
+                /*x*/ centralCoordinateX-xDis*8-15 , /*y*/ centralCoordinateY-5, /*z*/ centralCoordinateZ+30f,
+                centralCoordinateTorque-0.5f);
 
 //        addMapping(6, 16,
 //                /*gridX*/ 0, /*gridY*/ 16,

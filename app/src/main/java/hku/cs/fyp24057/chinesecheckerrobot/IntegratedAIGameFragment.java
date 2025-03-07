@@ -11,6 +11,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -40,8 +41,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -102,6 +105,8 @@ public class IntegratedAIGameFragment extends Fragment {
 
     private Button btnResetArm;
 
+    private Button btnDetectPosition;
+
     private boolean isPlayer1Turn = true; // Default, can be toggled
 
     @Override
@@ -159,6 +164,8 @@ public class IntegratedAIGameFragment extends Fragment {
         btnStopGripper = view.findViewById(R.id.btnStopGripper);
 
         btnResetArm = view.findViewById(R.id.btnResetArm);
+
+        btnDetectPosition = view.findViewById(R.id.btnDetectPosition);
 
         // Set up listeners
         setupButtons();
@@ -294,8 +301,57 @@ public class IntegratedAIGameFragment extends Fragment {
                 tvAIResponse.append("\nReset completed.");
             }, 500);
         });
+
+        btnDetectPosition.setOnClickListener(v -> {
+            detectCurrentPosition();
+        });
+
     }
 
+
+    private void detectCurrentPosition() {
+        if (isMoving) {
+            Toast.makeText(requireContext(),
+                    "Robot is currently moving. Please wait.",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        tvAIResponse.append("\nRequesting current position...");
+
+        // Get position feedback from the robot controller
+        JSONObject positionFeedback = robotController.getPositionFeedback();
+
+        if (positionFeedback != null) {
+            try {
+                float x = (float) positionFeedback.getDouble("x");
+                float y = (float) positionFeedback.getDouble("y");
+                float z = (float) positionFeedback.getDouble("z");
+                float t = (float) positionFeedback.getDouble("t");
+
+                String positionInfo = String.format(Locale.US,
+                        "\n\nCurrent Position:\nX: %.2f\nY: %.2f\nZ: %.2f\nTorque: %.2f",
+                        x, y, z, t);
+
+                // Add full JSON to see all available information
+                positionInfo += "\n\nRaw Feedback: " + positionFeedback.toString();
+
+                tvAIResponse.append(positionInfo);
+                Log.d(TAG, "Position feedback: " + positionFeedback);
+
+                // Scroll to the bottom of the text view
+                final ScrollView scrollView = (ScrollView) tvAIResponse.getParent().getParent();
+                scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
+
+            } catch (JSONException e) {
+                tvAIResponse.append("\nError parsing position data: " + e.getMessage());
+                Log.e(TAG, "Error parsing position data", e);
+            }
+        } else {
+            tvAIResponse.append("\nFailed to retrieve position data");
+            Log.e(TAG, "Failed to get position feedback");
+        }
+    }
     private void controlGripper(boolean close) {
         isMoving = true;
 
@@ -791,113 +847,238 @@ public class IntegratedAIGameFragment extends Fragment {
      * @param path List of coordinates representing the move path
      * @return true if successful, false if any step fails
      */
-    private boolean executeMove(List<CellCoordinate> path) {
-        // Constants for move parameters
-        final int MAX_RETRIES = 3;
-        final int RETRY_DELAY_MS = 2000;
-        final int MOVEMENT_WAIT_MS = 5000;
-        final int GRIPPER_WAIT_MS = 3000;
-        final float SAFE_Z = -60f;
+//    private boolean executeMove(List<CellCoordinate> path) {
+//        // Constants for move parameters
+//        final int MAX_RETRIES = 3;
+//        final int RETRY_DELAY_MS = 2000;
+//        final int MOVEMENT_WAIT_MS = 5000;
+//        final int GRIPPER_WAIT_MS = 3000;
+//        final float SAFE_Z = -80f;
+//
+//        // Get origin and destination
+//        CellCoordinate origin = path.get(0);
+//        CellCoordinate destination = path.get(path.size() - 1);
+//
+//        try {
+//            // Step 1: Move to a safe position above the origin
+//            updateProgress("Moving above origin piece");
+//            if (!moveWithRetry(origin.getX(), origin.getY(), SAFE_Z, origin.getTorque(),
+//                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+//                updateProgress("Failed to move above origin");
+//                return false;
+//            }
+//
+//            // Step 2: Move down to the piece
+//            updateProgress("Moving down to pick up piece");
+//            if (!moveWithRetry(origin.getX(), origin.getY(), origin.getZ(), origin.getTorque(),
+//                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+//                updateProgress("Failed to move down to piece");
+//                return false;
+//            }
+//
+//            // Step 3: Close gripper to grab piece
+//            updateProgress("Closing gripper to grab piece");
+//            robotController.controlGripper(true);
+//            Thread.sleep(GRIPPER_WAIT_MS);
+//
+//            // Step 4: Lift piece to safe height
+//            updateProgress("Lifting piece");
+//            if (!moveWithRetry(origin.getX(), origin.getY(), SAFE_Z, origin.getTorque(),
+//                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+//                updateProgress("Failed to lift piece");
+//                // Release grip in case of failure
+//                robotController.controlGripper(false);
+//                return false;
+//            }
+//
+//            // Step 5: Move through any intermediate points if they exist
+//            if (path.size() > 2) {
+//                for (int i = 1; i < path.size() - 1; i++) {
+//                    CellCoordinate intermediate = path.get(i);
+//                    updateProgress("Moving through position " + (i+1) + " of " + path.size());
+//
+//                    if (!moveWithRetry(intermediate.getX(), intermediate.getY(), SAFE_Z,
+//                            intermediate.getTorque(), MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+//                        updateProgress("Failed to move through intermediate position " + (i+1));
+//                        // Release grip in case of failure
+//                        robotController.controlGripper(false);
+//                        return false;
+//                    }
+//                }
+//            }
+//
+//            // Step 6: Move to position above destination
+//            updateProgress("Moving above destination");
+//            if (!moveWithRetry(destination.getX(), destination.getY(), SAFE_Z, destination.getTorque(),
+//                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+//                updateProgress("Failed to move above destination");
+//                // Release grip in case of failure
+//                robotController.controlGripper(false);
+//                return false;
+//            }
+//
+//            // Step 7: Lower piece to final position
+//            updateProgress("Lowering piece to destination");
+//            if (!moveWithRetry(destination.getX(), destination.getY(), destination.getZ(),
+//                    destination.getTorque(), MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+//                updateProgress("Failed to lower piece to destination");
+//                // Release grip anyway to drop piece
+//                robotController.controlGripper(false);
+//                return false;
+//            }
+//
+//            // Step 8: Open gripper to release piece
+//            updateProgress("Opening gripper to release piece");
+//            robotController.controlGripper(false);
+//            Thread.sleep(GRIPPER_WAIT_MS);
+//
+//            // Step 9: Lift arm back to safe height
+//            updateProgress("Lifting arm from destination");
+//            if (!moveWithRetry(destination.getX(), destination.getY(), SAFE_Z, destination.getTorque(),
+//                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
+//                updateProgress("Failed to lift arm from destination (but piece was placed)");
+//                // Not a critical failure as the piece was placed
+//                return true;
+//            }
+//
+//            // Step 10: Return to home position
+//            updateProgress("Returning to home position");
+//            robotController.reset();
+//            Thread.sleep(MOVEMENT_WAIT_MS);
+//
+//            return true;
+//
+//        } catch (Exception e) {
+//            Log.e(TAG, "Error during move execution", e);
+//            updateProgress("Error: " + e.getMessage());
+//            // Try to release grip in case of exception
+//            try {
+//                robotController.controlGripper(false);
+//            } catch (Exception ex) {
+//                Log.e(TAG, "Error releasing gripper", ex);
+//            }
+//            return false;
+//        }
+//    }
 
-        // Get origin and destination
-        CellCoordinate origin = path.get(0);
-        CellCoordinate destination = path.get(path.size() - 1);
+    private boolean executeMove(List<CellCoordinate> path) {
+        // Constants
+        final int GRIPPER_WAIT_MS = 3000;
+        final CountDownLatch moveLatch = new CountDownLatch(1);
+        final AtomicBoolean moveSuccess = new AtomicBoolean(false);
 
         try {
-            // Step 1: Move to a safe position above the origin
-            updateProgress("Moving above origin piece");
-            if (!moveWithRetry(origin.getX(), origin.getY(), SAFE_Z, origin.getTorque(),
-                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-                updateProgress("Failed to move above origin");
+            // Step 1: Move to origin position to pick up marble
+            CellCoordinate origin = path.get(0);
+            updateProgress("Moving to pick up marble");
+
+            // Execute movement with callback
+            CompletableFuture<Boolean> originMove = robotController.executeVerifiedMovement(
+                    origin.getX(), origin.getY(), origin.getZ(), origin.getTorque(),
+                    new RobotController.MovementCallback() {
+                        @Override
+                        public void onSuccess() {
+                            updateProgress("Successfully reached pick up position");
+                            moveSuccess.set(true);
+                            moveLatch.countDown();
+                        }
+
+                        @Override
+                        public void onFailure(String errorMessage) {
+                            updateProgress("Failed to reach pick up position: " + errorMessage);
+                            moveLatch.countDown();
+                        }
+
+                        @Override
+                        public void onProgress(String status) {
+                            updateProgress(status);
+                        }
+                    }
+            );
+
+            // Wait for movement to complete
+            moveLatch.await();
+            if (!moveSuccess.get()) {
+                updateProgress("Failed to reach pick up position");
                 return false;
             }
 
-            // Step 2: Move down to the piece
-            updateProgress("Moving down to pick up piece");
-            if (!moveWithRetry(origin.getX(), origin.getY(), origin.getZ(), origin.getTorque(),
-                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-                updateProgress("Failed to move down to piece");
-                return false;
-            }
-
-            // Step 3: Close gripper to grab piece
-            updateProgress("Closing gripper to grab piece");
+            // Step 2: Close gripper to grab marble
+            updateProgress("Grabbing marble");
             robotController.controlGripper(true);
             Thread.sleep(GRIPPER_WAIT_MS);
 
-            // Step 4: Lift piece to safe height
-            updateProgress("Lifting piece");
-            if (!moveWithRetry(origin.getX(), origin.getY(), SAFE_Z, origin.getTorque(),
-                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-                updateProgress("Failed to lift piece");
-                // Release grip in case of failure
-                robotController.controlGripper(false);
-                return false;
-            }
+            // Step 3: Move through all intermediate points in path
+            for (int i = 1; i < path.size(); i++) {
+                final CellCoordinate nextPosition = path.get(i);
+                final int moveIndex = i;
+                final CountDownLatch stepLatch = new CountDownLatch(1);
+                final AtomicBoolean stepSuccess = new AtomicBoolean(false);
 
-            // Step 5: Move through any intermediate points if they exist
-            if (path.size() > 2) {
-                for (int i = 1; i < path.size() - 1; i++) {
-                    CellCoordinate intermediate = path.get(i);
-                    updateProgress("Moving through position " + (i+1) + " of " + path.size());
+                updateProgress("Moving to position " + moveIndex + " of " + (path.size() - 1));
 
-                    if (!moveWithRetry(intermediate.getX(), intermediate.getY(), SAFE_Z,
-                            intermediate.getTorque(), MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-                        updateProgress("Failed to move through intermediate position " + (i+1));
-                        // Release grip in case of failure
-                        robotController.controlGripper(false);
-                        return false;
-                    }
+                CompletableFuture<Boolean> stepMove = robotController.executeVerifiedMovement(
+                        nextPosition.getX(), nextPosition.getY(), nextPosition.getZ(), nextPosition.getTorque(),
+                        new RobotController.MovementCallback() {
+                            @Override
+                            public void onSuccess() {
+                                updateProgress("Successfully reached position " + moveIndex);
+                                stepSuccess.set(true);
+                                stepLatch.countDown();
+                            }
+
+                            @Override
+                            public void onFailure(String errorMessage) {
+                                updateProgress("Failed to reach position " + moveIndex + ": " + errorMessage);
+                                stepLatch.countDown();
+                            }
+
+                            @Override
+                            public void onProgress(String status) {
+                                updateProgress(status);
+                            }
+                        }
+                );
+
+                // Wait for step to complete
+                stepLatch.await();
+                if (!stepSuccess.get()) {
+                    updateProgress("Failed to reach position " + moveIndex);
+                    robotController.controlGripper(false); // Release grip on failure
+                    return false;
                 }
             }
 
-            // Step 6: Move to position above destination
-            updateProgress("Moving above destination");
-            if (!moveWithRetry(destination.getX(), destination.getY(), SAFE_Z, destination.getTorque(),
-                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-                updateProgress("Failed to move above destination");
-                // Release grip in case of failure
-                robotController.controlGripper(false);
-                return false;
-            }
-
-            // Step 7: Lower piece to final position
-            updateProgress("Lowering piece to destination");
-            if (!moveWithRetry(destination.getX(), destination.getY(), destination.getZ(),
-                    destination.getTorque(), MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-                updateProgress("Failed to lower piece to destination");
-                // Release grip anyway to drop piece
-                robotController.controlGripper(false);
-                return false;
-            }
-
-            // Step 8: Open gripper to release piece
-            updateProgress("Opening gripper to release piece");
+            // Step 4: Release marble at final position
+            updateProgress("Releasing marble");
             robotController.controlGripper(false);
             Thread.sleep(GRIPPER_WAIT_MS);
 
-            // Step 9: Lift arm back to safe height
-            updateProgress("Lifting arm from destination");
-            if (!moveWithRetry(destination.getX(), destination.getY(), SAFE_Z, destination.getTorque(),
-                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-                updateProgress("Failed to lift arm from destination (but piece was placed)");
-                // Not a critical failure as the piece was placed
-                return true;
-            }
-
-            // Step 10: Return to home position
+            // Step 5: Return to home position
             updateProgress("Returning to home position");
-            robotController.reset();
-            Thread.sleep(MOVEMENT_WAIT_MS);
+            final CountDownLatch resetLatch = new CountDownLatch(1);
+
+            // Send reset command asynchronously
+            new Thread(() -> {
+                robotController.reset();
+                try {
+                    Thread.sleep(2000); // Give reset time to execute
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                resetLatch.countDown();
+            }).start();
+
+            // Wait for reset to complete
+            resetLatch.await();
 
             return true;
 
         } catch (Exception e) {
             Log.e(TAG, "Error during move execution", e);
             updateProgress("Error: " + e.getMessage());
-            // Try to release grip in case of exception
             try {
-                robotController.controlGripper(false);
+                robotController.controlGripper(false); // Make sure to release gripper on error
             } catch (Exception ex) {
                 Log.e(TAG, "Error releasing gripper", ex);
             }
@@ -913,45 +1094,138 @@ public class IntegratedAIGameFragment extends Fragment {
      */
     private boolean moveWithRetry(float x, float y, float z, float torque,
                                   int maxRetries, int retryDelayMs, int waitTimeMs) {
-        // Set position tolerance to 3mm (expressed in robot units)
-        final float POSITION_TOLERANCE = 10.0f;
+        // Set position tolerance to 2mm (expressed in robot units)
+        final float POSITION_TOLERANCE = 2.0f;
+        // Maximum number of retry attempts
+        final int MAX_TRIES = 5;
+        // Step size of 1mm for each adjustment
+        final float CORRECTION_STEP = 1.0f;
 
-        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        for (int attempt = 1; attempt <= MAX_TRIES; attempt++) {
             try {
+                // Calculate the target for this attempt
+                float targetX = x;
+                float targetY = y;
+                float targetZ = z;
+
+                // Only adjust the target on retry attempts
                 if (attempt > 1) {
-                    updateProgress("Retry attempt " + attempt + " of " + maxRetries);
+                    // Get current position to calculate error direction
+                    JSONObject currentPos = robotController.getPositionFeedback();
+                    if (currentPos != null) {
+                        try {
+                            float currentX = (float) currentPos.getDouble("x");
+                            float currentY = (float) currentPos.getDouble("y");
+
+                            // Calculate the error from the ORIGINAL target
+                            float diffX = x - currentX;
+                            float diffY = y - currentY;
+
+                            // For first correction (attempt 2), just use the difference
+//                            if (attempt == 2) {
+                                if (attempt >= 2) {
+                                targetX = x + diffX;
+                                targetY = y + diffY;
+                                updateProgress(String.format(Locale.US,
+                                        "First correction (attempt %d):\n" +
+                                                "Original target: (X=%.2f, Y=%.2f, Z=%.2f)\n" +
+                                                "Current position: (X=%.2f, Y=%.2f)\n" +
+                                                "Error: (X=%.2f, Y=%.2f)\n" +
+                                                "Applying exact error correction\n" +
+                                                "Adjusted target: (X=%.2f, Y=%.2f, Z=%.2f)",
+                                        attempt,
+                                        x, y, z,
+                                        currentX, currentY,
+                                        diffX, diffY,
+                                        targetX, targetY, targetZ));
+                            }
+                            // For subsequent corrections, add increasing step size
+                            else {
+                                float additionalCorrection = CORRECTION_STEP * (attempt - 2);
+                                targetX = x + diffX* 0 + (diffX >= 0 ? additionalCorrection : -additionalCorrection);
+                                targetY = y + diffY* 0 + (diffY >= 0 ? additionalCorrection : -additionalCorrection);
+
+                                updateProgress(String.format(Locale.US,
+                                        "Correction attempt %d:\n" +
+                                                "Original target: (X=%.2f, Y=%.2f, Z=%.2f)\n" +
+                                                "Current position: (X=%.2f, Y=%.2f)\n" +
+                                                "Error: (X=%.2f, Y=%.2f)\n" +
+                                                "Additional correction: %.2f mm\n" +
+                                                "Adjusted target: (X=%.2f, Y=%.2f, Z=%.2f)",
+                                        attempt,
+                                        x, y, z,
+                                        currentX, currentY,
+                                        diffX, diffY,
+                                        additionalCorrection,
+                                        targetX, targetY, targetZ));
+                            }
+                        } catch (JSONException e) {
+                            updateProgress("Error parsing current position for adjustment: " + e.getMessage());
+                        }
+                    } else {
+                        updateProgress("Couldn't get current position for adjustment. Using original target.");
+                    }
                 }
 
                 // Send the movement command
-                robotController.moveTo(x, y, z, torque);
+                updateProgress("Sending movement command to: X=" + targetX + ", Y=" + targetY +
+                        ", Z=" + targetZ + ", T=" + torque);
+                robotController.moveTo(targetX, targetY, targetZ, torque);
 
                 // Wait for movement to complete
+                updateProgress("Waiting for movement to complete...");
                 Thread.sleep(waitTimeMs);
 
                 // Check position feedback
+                updateProgress("Getting position feedback...");
                 JSONObject feedback = robotController.getPositionFeedback();
                 if (feedback != null) {
                     float currentX = (float) feedback.getDouble("x");
                     float currentY = (float) feedback.getDouble("y");
                     float currentZ = (float) feedback.getDouble("z");
+                    float currentT = (float) feedback.getDouble("t");
 
+                    // Calculate differences from the ORIGINAL TARGET
+                    float diffX = x - currentX;
+                    float diffY = y - currentY;
+
+                    // Only check X and Y coordinates (exclude Z)
                     boolean isPositionCorrect =
-                            Math.abs(currentX - x) <= POSITION_TOLERANCE &&
-                                    Math.abs(currentY - y) <= POSITION_TOLERANCE &&
-                                    Math.abs(currentZ - z) <= POSITION_TOLERANCE;
+                            Math.abs(diffX) <= POSITION_TOLERANCE &&
+                                    Math.abs(diffY) <= POSITION_TOLERANCE;
 
                     if (isPositionCorrect) {
+                        updateProgress("Position reached successfully with tolerance of " + POSITION_TOLERANCE + "mm");
+                        updateProgress(String.format(Locale.US,
+                                "Target: (X=%.2f, Y=%.2f, Z=%.2f, T=%.2f)",
+                                x, y, z, torque));
+                        updateProgress(String.format(Locale.US,
+                                "Final position: (X=%.2f, Y=%.2f, Z=%.2f, T=%.2f)",
+                                currentX, currentY, currentZ, currentT));
                         return true;
                     } else {
-                        updateProgress(String.format("Position not reached. Target(%.1f,%.1f,%.1f) Current(%.1f,%.1f,%.1f) Tolerance: %.1f",
-                                x, y, z, currentX, currentY, currentZ, POSITION_TOLERANCE));
+                        String positionInfo = String.format(Locale.US,
+                                "Position not reached (attempt %d/%d)\n" +
+                                        "Original target: (X=%.2f, Y=%.2f, Z=%.2f, T=%.2f)\n" +
+                                        "Actual position: (X=%.2f, Y=%.2f, Z=%.2f, T=%.2f)\n" +
+                                        "Error: (X=%.2f, Y=%.2f)\n" +
+                                        "Tolerance: %.2f",
+                                attempt, MAX_TRIES,
+                                x, y, z, torque,
+                                currentX, currentY, currentZ, currentT,
+                                diffX, diffY,
+                                POSITION_TOLERANCE);
+
+                        updateProgress(positionInfo);
+                        updateProgress("Raw feedback: " + feedback.toString());
                     }
                 } else {
                     updateProgress("Could not get position feedback");
                 }
 
                 // If we're here, position wasn't reached - wait before retry
-                if (attempt < maxRetries) {
+                if (attempt < MAX_TRIES) {
+                    updateProgress("Waiting " + retryDelayMs + "ms before retry...");
                     Thread.sleep(retryDelayMs);
                 }
 
@@ -960,7 +1234,7 @@ public class IntegratedAIGameFragment extends Fragment {
                 updateProgress("Error: " + e.getMessage());
 
                 try {
-                    if (attempt < maxRetries) {
+                    if (attempt < MAX_TRIES) {
                         Thread.sleep(retryDelayMs);
                     }
                 } catch (InterruptedException ie) {
@@ -970,6 +1244,7 @@ public class IntegratedAIGameFragment extends Fragment {
             }
         }
 
+        updateProgress("Failed to reach position after " + MAX_TRIES + " attempts");
         return false;  // All retries failed
     }
 

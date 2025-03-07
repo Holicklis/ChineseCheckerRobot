@@ -30,11 +30,11 @@ public class RobotController {
 
     // Settings
     private static final int HTTP_TIMEOUT_MS = 1000;
-    private static final float DEFAULT_SPEED = 1.00f;  // Speed setting
+    private static final float DEFAULT_SPEED = 2f;  // Speed setting
     private static final int MOVEMENT_DELAY_MS = 5000;
     private static final int SHORT_DELAY_MS = 5000;
-    private static final float DEFAULT_POSITION_TOLERANCE = 5.0f;
-    private static final int DEFAULT_MAX_RETRIES = 3;
+    private static final float DEFAULT_POSITION_TOLERANCE = 2.0f;
+    private static final int DEFAULT_MAX_RETRIES = 5;
     private static final int VERIFICATION_DELAY_MS = 500;
     private static final float SAFE_Z = -60f;
 
@@ -244,19 +244,103 @@ public class RobotController {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
 
         commandExecutor.submit(() -> {
+            // Use the provided tolerance
+            final float POSITION_TOLERANCE = tolerance;
+            // Use the provided max retries
+            final int MAX_TRIES = maxRetries;
+            // Step size of 1mm for each adjustment
+            final float CORRECTION_STEP = 1.0f;
+
+            // Store original target values - these never change
+            final float originalX = targetX;
+            final float originalY = targetY;
+            final float originalZ = targetZ;
+
             int attemptCount = 0;
             boolean success = false;
 
-            while (attemptCount < maxRetries && !success) {
+            while (attemptCount < MAX_TRIES && !success) {
                 attemptCount++;
+
+                // Calculate adjusted target for this attempt
+                float adjustedX = originalX;
+                float adjustedY = originalY;
+                float adjustedZ = originalZ;
+
+                // Only apply corrections on retry attempts
+                if (attemptCount > 1) {
+                    // Get current position to determine error direction
+                    JSONObject currentPos = getPositionFeedback();
+                    if (currentPos != null) {
+                        try {
+                            float currentX = (float) currentPos.getDouble("x");
+                            float currentY = (float) currentPos.getDouble("y");
+
+                            // Calculate errors from original target
+                            float diffX = originalX - currentX;
+                            float diffY = originalY - currentY;
+
+                            // For first correction (attempt 2), just use the difference
+//                            if (attemptCount == 2) {
+                            if (attemptCount >= 2) {
+                                adjustedX = originalX
+                                        + diffX;
+                                adjustedY = originalY + diffY;
+
+                                if (callback != null) {
+                                    callback.onProgress(String.format(
+                                            "First correction (attempt %d):\n" +
+                                                    "Original target: (%.2f, %.2f, %.2f)\n" +
+                                                    "Current position: (%.2f, %.2f)\n" +
+                                                    "Error: (X=%.2f, Y=%.2f)\n" +
+                                                    "Applying exact error correction\n" +
+                                                    "Adjusted target: (%.2f, %.2f, %.2f)",
+                                            attemptCount,
+                                            originalX, originalY, originalZ,
+                                            currentX, currentY,
+                                            diffX, diffY,
+                                            adjustedX, adjustedY, adjustedZ));
+                                }
+                            }
+                            // For subsequent corrections, add increasing step size
+                            else {
+                                float additionalCorrection = CORRECTION_STEP * (attemptCount - 2);
+                                adjustedX = originalX + diffX*0 + (diffX >= 0 ? additionalCorrection : -additionalCorrection);
+                                adjustedY = originalY + diffY* 0 + (diffY >= 0 ? additionalCorrection : -additionalCorrection);
+
+                                if (callback != null) {
+                                    callback.onProgress(String.format(
+                                            "Correction attempt %d:\n" +
+                                                    "Original target: (%.2f, %.2f, %.2f)\n" +
+                                                    "Current position: (%.2f, %.2f)\n" +
+                                                    "Error: (X=%.2f, Y=%.2f)\n" +
+                                                    "Additional correction: %.2f mm\n" +
+                                                    "Adjusted target: (%.2f, %.2f, %.2f)",
+                                            attemptCount,
+                                            originalX, originalY, originalZ,
+                                            currentX, currentY,
+                                            diffX, diffY,
+                                            additionalCorrection,
+                                            adjustedX, adjustedY, adjustedZ));
+                                }
+                            }
+                        } catch (JSONException e) {
+                            Log.e(TAG, "Error parsing position data for adjustment", e);
+                            if (callback != null) {
+                                callback.onProgress("Error calculating adjustment: " + e.getMessage());
+                            }
+                        }
+                    }
+                }
 
                 if (callback != null) {
                     String statusMsg = String.format("Moving to (%.2f,%.2f,%.2f) - Attempt %d of %d",
-                            targetX, targetY, targetZ, attemptCount, maxRetries);
+                            adjustedX, adjustedY, adjustedZ, attemptCount, MAX_TRIES);
                     callback.onProgress(statusMsg);
                 }
 
-                moveToWithPrecisionSequence(targetX, targetY, targetZ, targetTorque);
+                // Use sequential movement for better precision
+                moveToWithPrecisionSequence(adjustedX, adjustedY, adjustedZ, targetTorque);
 
                 try {
                     Thread.sleep(MOVEMENT_DELAY_MS);
@@ -273,22 +357,74 @@ public class RobotController {
                     Thread.currentThread().interrupt();
                 }
 
-                success = verifyPosition(targetX, targetY, targetZ, tolerance);
+                // Get position feedback to check result - always compare against original target
+                JSONObject feedback = getPositionFeedback();
+                if (feedback == null) {
+                    if (callback != null) {
+                        callback.onProgress("Could not get position feedback");
+                    }
+                    continue;
+                }
 
-                if (success) {
-                    if (callback != null) callback.onSuccess();
-                    future.complete(true);
-                    return;
-                } else {
-                    Log.w(TAG, "Position verification failed, attempt: " + attemptCount);
-                    if (callback != null && attemptCount < maxRetries) {
-                        callback.onProgress("Position verification failed, retrying...");
+                try {
+                    float currentX = (float) feedback.getDouble("x");
+                    float currentY = (float) feedback.getDouble("y");
+                    float currentZ = (float) feedback.getDouble("z");
+                    float currentT = (float) feedback.getDouble("t");
+
+                    // Calculate differences between ORIGINAL target and actual positions
+                    float diffX = originalX - currentX;
+                    float diffY = originalY - currentY;
+
+                    // Only check X and Y coordinates (exclude Z)
+                    success = Math.abs(diffX) <= POSITION_TOLERANCE &&
+                            Math.abs(diffY) <= POSITION_TOLERANCE;
+
+                    if (success) {
+                        if (callback != null) {
+                            callback.onProgress(String.format(
+                                    "Position reached within tolerance of %.2fmm\n" +
+                                            "Original target: (%.2f, %.2f, %.2f)\n" +
+                                            "Final position: (%.2f, %.2f, %.2f)",
+                                    POSITION_TOLERANCE,
+                                    originalX, originalY, originalZ,
+                                    currentX, currentY, currentZ));
+                            callback.onSuccess();
+                        }
+                        future.complete(true);
+                        return;
+                    } else {
+                        Log.w(TAG, "Position verification failed, attempt: " + attemptCount);
+
+                        String posInfo = String.format(
+                                "Position verification failed (attempt %d/%d)\n" +
+                                        "Original target: (%.2f, %.2f, %.2f, %.2f)\n" +
+                                        "Adjusted target: (%.2f, %.2f, %.2f, %.2f)\n" +
+                                        "Actual position: (%.2f, %.2f, %.2f, %.2f)\n" +
+                                        "Error: (X=%.2f, Y=%.2f)\n" +
+                                        "Tolerance: %.2f",
+                                attemptCount, MAX_TRIES,
+                                originalX, originalY, originalZ, targetTorque,
+                                adjustedX, adjustedY, adjustedZ, targetTorque,
+                                currentX, currentY, currentZ, currentT,
+                                diffX, diffY,
+                                POSITION_TOLERANCE);
+
+                        if (callback != null) {
+                            callback.onProgress(posInfo);
+                            callback.onProgress("Raw feedback: " + feedback.toString());
+                        }
+                    }
+                } catch (JSONException e) {
+                    Log.e(TAG, "Error parsing position data", e);
+                    if (callback != null && attemptCount < MAX_TRIES) {
+                        callback.onProgress("Error parsing position data: " + e.getMessage());
                     }
                 }
             }
 
             if (callback != null) {
-                callback.onFailure("Failed to reach position after " + maxRetries + " attempts");
+                callback.onFailure("Failed to reach position after " + MAX_TRIES + " attempts");
             }
             future.complete(false);
         });
