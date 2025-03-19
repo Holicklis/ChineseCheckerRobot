@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Surface;
 import android.view.View;
@@ -84,7 +85,7 @@ public class IntegratedAIGameFragment extends Fragment {
     private boolean hasEmptyBoard = false;
 
     // Network Clients
-    private String serverIp = "192.168.11.175"; // Default
+    private String serverIp = "192.168.11.192"; // Default
     private String robotIp = "192.168.11.172"; // Default
     private OkHttpClient client;
     private BoardDetectionClient detectionClient;
@@ -106,6 +107,8 @@ public class IntegratedAIGameFragment extends Fragment {
     private Button btnResetArm;
 
     private Button btnDetectPosition;
+
+    private Button btnAutoPlay;
 
     private boolean isPlayer1Turn = true; // Default, can be toggled
 
@@ -166,6 +169,9 @@ public class IntegratedAIGameFragment extends Fragment {
         btnResetArm = view.findViewById(R.id.btnResetArm);
 
         btnDetectPosition = view.findViewById(R.id.btnDetectPosition);
+
+        btnAutoPlay = view.findViewById(R.id.btnAutoPlay);
+        setupKeyboardListener();
 
         // Set up listeners
         setupButtons();
@@ -305,7 +311,12 @@ public class IntegratedAIGameFragment extends Fragment {
         btnDetectPosition.setOnClickListener(v -> {
             detectCurrentPosition();
         });
+        btnAutoPlay.setOnClickListener(v -> {
+            startAutoPlaySequence();
+        });
 
+
+        updateAutoPlayButtonState();
     }
 
 
@@ -354,6 +365,7 @@ public class IntegratedAIGameFragment extends Fragment {
     }
     private void controlGripper(boolean close) {
         isMoving = true;
+        updateAutoPlayButtonState();
 
         robotController.controlGripper(close);
 
@@ -369,6 +381,7 @@ public class IntegratedAIGameFragment extends Fragment {
         // Allow movement again after a short delay
         new Handler().postDelayed(() -> {
             isMoving = false;
+            updateAutoPlayButtonState();
         }, 1000);
     }
 
@@ -474,6 +487,7 @@ public class IntegratedAIGameFragment extends Fragment {
             // Lock UI and set moving flag
             isMoving = true;
             btnLookupCoords.setEnabled(false);
+            updateAutoPlayButtonState();
 
             // Use the improved controller to move with verification
             CompletableFuture<Boolean> moveFuture = robotController.executeVerifiedMovement(
@@ -483,6 +497,7 @@ public class IntegratedAIGameFragment extends Fragment {
                         public void onSuccess() {
                             requireActivity().runOnUiThread(() -> {
                                 isMoving = false;
+                                updateAutoPlayButtonState();
                                 btnLookupCoords.setEnabled(true);
                                 Toast.makeText(requireContext(),
                                         "Movement completed successfully",
@@ -494,6 +509,7 @@ public class IntegratedAIGameFragment extends Fragment {
                         public void onFailure(String errorMessage) {
                             requireActivity().runOnUiThread(() -> {
                                 isMoving = false;
+                                updateAutoPlayButtonState();
                                 btnLookupCoords.setEnabled(true);
                                 Toast.makeText(requireContext(),
                                         "Movement failed: " + errorMessage,
@@ -743,6 +759,7 @@ public class IntegratedAIGameFragment extends Fragment {
         try {
             // Set moving flag
             isMoving = true;
+            updateAutoPlayButtonState();
 
             // Step 1: Convert JSON array of board coordinates into CellCoordinates
             List<CellCoordinate> path = new ArrayList<>();
@@ -775,6 +792,7 @@ public class IntegratedAIGameFragment extends Fragment {
             if (path.size() < 2) {
                 requireActivity().runOnUiThread(() -> {
                     isMoving = false;
+                    updateAutoPlayButtonState();
                     btnExecuteMove.setEnabled(true);
                     tvAIResponse.append("\nError: Could not create a valid path with at least 2 points");
                     Toast.makeText(requireContext(), "Invalid path from AI", Toast.LENGTH_SHORT).show();
@@ -803,6 +821,7 @@ public class IntegratedAIGameFragment extends Fragment {
                     boolean success = executeMove(path);
                     requireActivity().runOnUiThread(() -> {
                         isMoving = false;
+                        updateAutoPlayButtonState();
                         btnExecuteMove.setEnabled(true);
                         if (success) {
                             tvAIResponse.append("\nMove sequence completed successfully!");
@@ -820,6 +839,7 @@ public class IntegratedAIGameFragment extends Fragment {
                     Log.e(TAG, "Error in move thread", e);
                     requireActivity().runOnUiThread(() -> {
                         isMoving = false;
+                        updateAutoPlayButtonState();
                         btnExecuteMove.setEnabled(true);
                         tvAIResponse.append("\nError: " + e.getMessage());
                         Toast.makeText(requireContext(),
@@ -833,6 +853,7 @@ public class IntegratedAIGameFragment extends Fragment {
             Log.e(TAG, "Error executing AI move sequence", e);
             requireActivity().runOnUiThread(() -> {
                 isMoving = false;
+                updateAutoPlayButtonState();
                 btnExecuteMove.setEnabled(true);
                 tvAIResponse.append("\nError: " + e.getMessage());
                 Toast.makeText(requireContext(),
@@ -1307,5 +1328,371 @@ public class IntegratedAIGameFragment extends Fragment {
                 Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
             }
         }, ContextCompat.getMainExecutor(requireContext()));
+    }
+
+    //auto play logic
+    private void startAutoPlaySequence() {
+        updateAutoPlayButtonState();
+        if (isMoving) {
+            Toast.makeText(requireContext(),
+                    "Robot is currently moving. Please wait.",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Clear previous responses
+        tvAIResponse.setText("Starting automated play sequence...");
+
+        // Step 1: Detect current board state
+        if (!hasEmptyBoard) {
+            tvAIResponse.append("\n⚠️ Empty board not captured yet. Please capture empty board first.");
+            Toast.makeText(requireContext(),
+                    "Please capture empty board first",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        tvAIResponse.append("\n1. Detecting current board state...");
+
+        // Use a callback-based approach for the detection
+        detectCurrentBoardWithCallback(new BoardDetectionCallback() {
+            @Override
+            public void onDetectionSuccess(List<String> boardState) {
+                // Board detected successfully, continue with validation and AI move
+                tvAIResponse.append("\nBoard state detected successfully.");
+                validateAndGetAiMove(boardState);
+            }
+
+            @Override
+            public void onDetectionFailure(String error) {
+                tvAIResponse.append("\n❌ Error detecting board state: " + error);
+            }
+        });
+    }
+
+
+    //capture state
+    private void detectCurrentBoardWithCallback(BoardDetectionCallback callback) {
+        if (imageCapture == null) {
+            callback.onDetectionFailure("Camera not initialized. Please restart the app.");
+            return;
+        }
+
+        imageCapture.takePicture(ContextCompat.getMainExecutor(requireContext()),
+                new ImageCapture.OnImageCapturedCallback() {
+                    @Override
+                    public void onCaptureSuccess(@NonNull ImageProxy image) {
+                        Bitmap bitmap = imageProxyToBitmap(image);
+                        if (bitmap != null) {
+                            // Process the image with callback
+                            processImageWithCallback(bitmap, callback);
+                        } else {
+                            callback.onDetectionFailure("Failed to process captured image.");
+                        }
+                        image.close();
+                    }
+
+                    @Override
+                    public void onError(@NonNull ImageCaptureException exception) {
+                        Log.e(TAG, "Image capture failed", exception);
+                        callback.onDetectionFailure("Failed to capture image: " + exception.getMessage());
+                    }
+                });
+    }
+    //process image
+
+    private void processImageWithCallback(Bitmap bitmap, BoardDetectionCallback callback) {
+        detectionClient.detectCurrentState(bitmap, new BoardDetectionClient.DetectionCallback() {
+            @Override
+            public void onSuccess(List<String> boardState) {
+                requireActivity().runOnUiThread(() -> {
+                    if (boardState != null) {
+                        currentBoardState = boardState;
+
+                        // Display the board state
+                        StringBuilder display = new StringBuilder("Detected Board State:\n\n");
+                        for (String row : boardState) {
+                            display.append(row).append('\n');
+                        }
+                        tvBoardState.setText(display.toString());
+
+                        // Notify success through callback
+                        callback.onDetectionSuccess(boardState);
+                    } else {
+                        callback.onDetectionFailure("Received empty board state.");
+                    }
+                });
+            }
+
+            @Override
+            public void onError(String error) {
+                requireActivity().runOnUiThread(() -> {
+                    tvBoardState.setText("Error: " + error);
+                    callback.onDetectionFailure(error);
+                });
+            }
+        });
+    }
+
+    //aimove
+    private void validateAndGetAiMove(List<String> boardState) {
+        // Count green and red marbles
+        int greenCount = 0;
+        int redCount = 0;
+
+        for (String row : boardState) {
+            for (char c : row.toCharArray()) {
+                if (c == 'G') greenCount++;
+                else if (c == 'R') redCount++;
+            }
+        }
+
+        tvAIResponse.append("\nBoard analysis: Found " + greenCount + " green and " + redCount + " red marbles.");
+
+        // Validate counts
+        if (greenCount != 10 || redCount != 10) {
+            tvAIResponse.append("\n❌ Invalid board state detected! Expected exactly 10 green and 10 red marbles.");
+            tvAIResponse.append("\n   Please adjust the board or try capturing again.");
+            return;
+        }
+
+        // Board is valid, proceed to get AI move
+        tvAIResponse.append("\n✓ Valid board state confirmed.");
+        tvAIResponse.append("\n2. Requesting AI move...");
+
+        getAIMoveWithCallback(boardState, new AIMoveCallback() {
+            @Override
+            public void onMoveReceived(JSONArray moveSequence) {
+                // AI move received, execute it
+                tvAIResponse.append("\n✓ AI move received: " + moveSequence.toString());
+                tvAIResponse.append("\n3. Executing move...");
+
+                executeAIMoveWithCallback(moveSequence, new MoveExecutionCallback() {
+                    @Override
+                    public void onExecutionComplete(boolean success) {
+                        if (success) {
+                            tvAIResponse.append("\n✓ Move sequence completed successfully!");
+                            tvAIResponse.append("\n\nAuto play sequence COMPLETE ✓");
+                        } else {
+                            tvAIResponse.append("\n❌ Move sequence failed.");
+                        }
+                    }
+
+                    @Override
+                    public void onExecutionFailure(String error) {
+                        tvAIResponse.append("\n❌ Error executing move: " + error);
+                    }
+                });
+            }
+
+            @Override
+            public void onMoveFailure(String error) {
+                tvAIResponse.append("\n❌ Failed to get AI move: " + error);
+            }
+        });
+    }
+
+    private void getAIMoveWithCallback(List<String> boardState, AIMoveCallback callback) {
+        try {
+            // Prepare the request to the AI server
+            JSONObject jsonPayload = new JSONObject();
+
+            // Convert the detected board state format (G/R/.) to AI format (O/X/.)
+            List<String> convertedBoardState = new ArrayList<>();
+            for (String row : boardState) {
+                // Replace 'G' with 'O' (human player) and 'R' with 'X' (robot)
+                String convertedRow = row.replace('G', 'O').replace('R', 'X');
+                convertedBoardState.add(convertedRow);
+            }
+
+            // Add the converted board state
+            JSONArray boardStateArray = new JSONArray();
+            for (String row : convertedBoardState) {
+                boardStateArray.put(row);
+            }
+
+            jsonPayload.put("board_state", boardStateArray);
+            jsonPayload.put("is_player1", false); // Robot is always player2 (X)
+            jsonPayload.put("depth", 3);
+            jsonPayload.put("eval_func", 1);
+            jsonPayload.put("use_heuristic", true);
+
+            // Send the request to the AI server
+            String url = String.format("http://%s:%d/get_ai_move", serverIp, AI_PORT);
+
+            Request request = new Request.Builder()
+                    .url(url)
+                    .post(RequestBody.create(jsonPayload.toString(), JSON))
+                    .build();
+
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                    requireActivity().runOnUiThread(() -> {
+                        callback.onMoveFailure("Failed to connect to AI server: " + e.getMessage());
+                    });
+                }
+
+                @Override
+                public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                    final String responseData = response.body().string();
+                    requireActivity().runOnUiThread(() -> {
+                        try {
+                            JSONObject jsonResponse = new JSONObject(responseData);
+                            if (jsonResponse.getString("status").equals("success")) {
+                                JSONArray moveSequence = jsonResponse.getJSONArray("move_sequence");
+                                lastRecommendedMoveSequence = moveSequence;
+                                callback.onMoveReceived(moveSequence);
+                            }
+                            else if (jsonResponse.getString("status").equals("no_move_possible")) {
+                                callback.onMoveFailure("No valid moves available. Your turn!");
+                            }
+                            else {
+                                callback.onMoveFailure("Error from AI server: " +
+                                        jsonResponse.optString("message", "Unknown error"));
+                            }
+                        } catch (JSONException e) {
+                            callback.onMoveFailure("Error parsing AI response: " + e.getMessage());
+                        }
+                    });
+                }
+            });
+
+        } catch (JSONException e) {
+            callback.onMoveFailure("Error creating JSON payload: " + e.getMessage());
+        }
+    }
+
+    private void executeAIMoveWithCallback(JSONArray moveSequence, MoveExecutionCallback callback) {
+        if (moveSequence == null || moveSequence.length() < 2) {
+            callback.onExecutionFailure("Invalid move sequence received.");
+            return;
+        }
+
+        // Set moving flag
+        isMoving = true;
+        updateAutoPlayButtonState();
+
+        try {
+            // Convert JSON array of board coordinates into CellCoordinates
+            List<CellCoordinate> path = new ArrayList<>();
+            for (int i = 0; i < moveSequence.length(); i++) {
+                try {
+                    JSONObject coordObj = moveSequence.getJSONObject(i);
+                    int boardX = coordObj.getInt("x");
+                    int boardY = coordObj.getInt("y");
+
+                    // Convert board coords -> robot coords
+                    CellCoordinate cellCoord = BoardCoordinatesAdapter.getInstance()
+                            .getBoardCellCoordinate(boardX, boardY);
+
+                    if (cellCoord == null) {
+                        updateProgress("⚠️ No mapping for board coords (" + boardX + "," + boardY + ")");
+                        continue;
+                    }
+
+                    path.add(cellCoord);
+                } catch (JSONException e) {
+                    updateProgress("❌ Error parsing coordinate at index " + i);
+                }
+            }
+
+            if (path.size() < 2) {
+                isMoving = false;
+                updateAutoPlayButtonState();
+                callback.onExecutionFailure("Could not create a valid path with at least 2 points");
+                return;
+            }
+
+            // Actually execute the move on a background thread
+            new Thread(() -> {
+                try {
+                    boolean success = executeMove(path);
+                    requireActivity().runOnUiThread(() -> {
+                        isMoving = false;
+                        updateAutoPlayButtonState();
+                        if (success) {
+                            callback.onExecutionComplete(true);
+                        } else {
+                            callback.onExecutionComplete(false);
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in move thread", e);
+                    requireActivity().runOnUiThread(() -> {
+                        isMoving = false;
+                        updateAutoPlayButtonState();
+                        callback.onExecutionFailure(e.getMessage());
+                    });
+                }
+            }).start();
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error executing AI move sequence", e);
+            isMoving = false;
+            updateAutoPlayButtonState();
+            callback.onExecutionFailure(e.getMessage());
+        }
+    }
+
+    private void setupKeyboardListener() {
+        // Find the root view to attach the key listener
+        View rootView = requireView();
+
+        // Make the view focusable to receive key events
+        rootView.setFocusableInTouchMode(true);
+        rootView.requestFocus();
+
+        // Set up the key listener
+        rootView.setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                // Check if the Enter key is pressed
+                if (event.getAction() == KeyEvent.ACTION_DOWN &&
+                        (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER)) {
+
+                    Log.d(TAG, "Enter key pressed, triggering Auto Play");
+
+                    // Simulate a click on the Auto Play button
+                    if (btnAutoPlay != null && btnAutoPlay.isEnabled()) {
+                        btnAutoPlay.performClick();
+                        return true; // Indicate that we've handled this event
+                    }
+                }
+                return false; // Let other key events pass through
+            }
+        });
+
+        Log.d(TAG, "Keyboard listener set up successfully");
+    }
+
+    private void updateAutoPlayButtonState() {
+        if (btnAutoPlay != null) {
+            // Enable the button only if we're not currently moving the robot
+            btnAutoPlay.setEnabled(!isMoving);
+
+            // Additionally, you might want to visually indicate if the button is disabled
+            if (isMoving) {
+                btnAutoPlay.setAlpha(0.5f); // Make it look faded when disabled
+            } else {
+                btnAutoPlay.setAlpha(1.0f); // Full visibility when enabled
+            }
+        }
+    }
+
+    // Define callback interfaces for each step
+    private interface BoardDetectionCallback {
+        void onDetectionSuccess(List<String> boardState);
+        void onDetectionFailure(String error);
+    }
+
+    private interface AIMoveCallback {
+        void onMoveReceived(JSONArray moveSequence);
+        void onMoveFailure(String error);
+    }
+
+    private interface MoveExecutionCallback {
+        void onExecutionComplete(boolean success);
+        void onExecutionFailure(String error);
     }
 }

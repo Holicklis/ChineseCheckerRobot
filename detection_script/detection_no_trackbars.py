@@ -107,7 +107,7 @@ def preprocess_image(image, max_dim=1600, debug=False): #1600 unit: pixel
 # Marble Detection Parameters (Predefined)
 # ---------------------------
 # Predefined HSV ranges for green marbles
-GREEN_LOWER = np.array([36, 0, 0])      # [H, S, V]
+GREEN_LOWER = np.array([30, 60, 50])      # [H, S, V]
 GREEN_UPPER = np.array([86, 255, 255])
 
 # Predefined HSV ranges for red marbles (two ranges to cover hue wrap-around)
@@ -129,7 +129,7 @@ MARBLE_HOUGH_DP = 1.1
 MARBLE_HOUGH_MIN_DIST = 30
 MARBLE_HOUGH_PARAM1 = 50   # Canny high threshold
 MARBLE_HOUGH_PARAM2 = 15   # Accumulator threshold
-MARBLE_HOUGH_MIN_RADIUS = 10
+MARBLE_HOUGH_MIN_RADIUS = 15
 MARBLE_HOUGH_MAX_RADIUS = 30
 
 # Base threshold for marble to cell assignment
