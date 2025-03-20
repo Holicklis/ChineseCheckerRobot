@@ -6,6 +6,7 @@ import numpy as np
 from typing import List, Tuple, Dict, Optional
 import time
 import os
+import copy
 
 # Import your existing game classes
 from Board import Board
@@ -124,47 +125,48 @@ class BoardMapper:
         return coord_path
 
     def validate_move_sequence(self, path_coords):
-        """Validate that the move sequence is valid"""
+        """Validate that the move sequence is valid by simulating each move step-by-step."""
         if len(path_coords) < 2:
             return False, "Path too short"
-        
-        # Check each step in the path
-        for i in range(len(path_coords) - 1):
-            origin_x, origin_y = path_coords[i]
-            dest_x, dest_y = path_coords[i + 1]
-            
-            # Get tiles
-            origin_tile = self.get_tile_at_coord(origin_x, origin_y)
-            dest_tile = self.get_tile_at_coord(dest_x, dest_y)
-            
-            logger.info(f"Checking move from ({origin_x},{origin_y}) to ({dest_x},{dest_y})")
-            
-            
-            
-            
-            if origin_tile is None or dest_tile is None:
-                error_msg = f"Invalid move: Tile not found at ({origin_x},{origin_y}) or ({dest_x},{dest_y})"
-                logger.warning(error_msg)
-                return False, error_msg
-            
-            if origin_tile.is_empty():
-                error_msg = f"Invalid move: No piece at origin ({origin_x},{origin_y})"
-                logger.warning(error_msg)
-                return False, error_msg
-                
-            if not dest_tile.is_empty():
-                error_msg = f"Invalid move: Destination is not empty at ({dest_x},{dest_y})"
-                logger.warning(error_msg)
-                return False, error_msg
-            
-            # Check if dest_tile is a valid move from origin_tile
-            valid_moves = list(self.board.get_all_valid_moves(origin_tile))
-            if dest_tile not in valid_moves:
-                error_msg = f"Invalid move: Cannot move from ({origin_x},{origin_y}) to ({dest_x},{dest_y})"
-                logger.warning(error_msg)
-                return False, error_msg
-        
-        return True, "Valid move sequence"
+
+        # Save the original board state (only the pieces)
+        original_state = {tile: tile.get_piece() for tile in self.board.board_tiles}
+
+        try:
+            # Simulate each move step-by-step
+            for i in range(len(path_coords) - 1):
+                origin_x, origin_y = path_coords[i]
+                dest_x, dest_y = path_coords[i+1]
+                origin_tile = self.get_tile_at_coord(origin_x, origin_y)
+                dest_tile = self.get_tile_at_coord(dest_x, dest_y)
+
+                logger.info(f"Simulating move from ({origin_x},{origin_y}) to ({dest_x},{dest_y})")
+
+                # Basic checks on the simulated board
+                if origin_tile is None or dest_tile is None:
+                    return False, f"Invalid move: Tile not found at ({origin_x},{origin_y}) or ({dest_x},{dest_y})"
+
+                if origin_tile.get_piece() is None:
+                    return False, f"Invalid move: No piece at origin ({origin_x},{origin_y})"
+
+                if dest_tile.get_piece() is not None:
+                    return False, f"Invalid move: Destination is not empty at ({dest_x},{dest_y})"
+
+                # Validate that the destination is a legal move from the origin in the current simulated state
+                valid_moves = list(self.board.get_all_valid_moves(origin_tile))
+                if dest_tile not in valid_moves:
+                    return False, f"Invalid move: Cannot move from ({origin_x},{origin_y}) to ({dest_x},{dest_y})"
+
+                # Simulate the move: move the piece from origin_tile to dest_tile
+                piece = origin_tile.get_piece()
+                dest_tile.set_piece(piece)
+                origin_tile.set_empty()
+
+            return True, "Valid move sequence"
+        finally:
+            # Restore the original board state
+            for tile, piece in original_state.items():
+                tile.set_piece(piece)
 
     def save_debug_board_file(self, filename, board_state=None, move_sequence=None):
         """Save board visualization using Board's built-in to_string method"""
@@ -292,20 +294,39 @@ def get_ai_move():
         # Get the AI's multi-step path
         path_coords = board_mapper.get_ai_move_sequence(is_player1, depth, eval_func, use_heuristic)
         
+        # If no move is possible, return appropriate status
+        if not path_coords or len(path_coords) < 2:
+            logger.warning("No valid moves found")
+            return jsonify({
+                "status": "no_move_possible", 
+                "message": "No valid moves found for the current board state"
+            }), 200
+        
+        # Check if we need to find intermediate jumps
+        # If the distance between start and end is greater than 1 cell, we need to find jumps
+        start_coords = path_coords[0]
+        end_coords = path_coords[-1]
+        
+        # Log the initial path
+        logger.info(f"Initial path from AI: {path_coords}")
+        
+        # For distance greater than 1, find the complete jump path
+        if abs(end_coords[0] - start_coords[0]) > 1 or abs(end_coords[1] - start_coords[1]) > 1:
+            logger.info("Path appears to require jumps, finding complete path...")
+            complete_path = find_jump_path(board_mapper, start_coords, end_coords)
+            
+            if complete_path and len(complete_path) > len(path_coords):
+                logger.info(f"Found complete path with jumps: {complete_path}")
+                path_coords = complete_path
+            else:
+                logger.warning("Could not find a valid jump path!")
+        
         # Save the board state with the move sequence
         board_mapper.save_debug_board_file(
             f"board_with_move_{timestamp}.txt",
             board_state,
             path_coords
         )
-        
-        # If no move is possible, return appropriate status
-        if not path_coords:
-            logger.warning("No valid moves found")
-            return jsonify({
-                "status": "no_move_possible", 
-                "message": "No valid moves found for the current board state"
-            }), 200
         
         # Validate the move sequence
         is_valid, reason = board_mapper.validate_move_sequence(path_coords)
@@ -479,6 +500,77 @@ def test_move():
     except Exception as e:
         logger.error(f"Error in test_move: {str(e)}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500
+    
+def find_jump_path(board_mapper, start_coords, end_coords):
+    """
+    Finds a valid path of jumps from start to end coordinates.
+    Returns the complete path including all intermediate jumps.
+    """
+    start_x, start_y = start_coords
+    end_x, end_y = end_coords
+    
+    # Get tiles for start and end positions
+    start_tile = board_mapper.get_tile_at_coord(start_x, start_y)
+    end_tile = board_mapper.get_tile_at_coord(end_x, end_y)
+    
+    if start_tile is None or end_tile is None:
+        return None
+    
+    # Check if this is an adjacent move (not a jump)
+    for direction, neighbor in start_tile.get_neighbours().items():
+        if neighbor == end_tile:
+            # This is a direct adjacent move
+            return [start_coords, end_coords]
+    
+    # Try to find a jump path using BFS
+    queue = [(start_tile, [start_coords])]
+    visited = {start_tile}
+    
+    while queue:
+        current_tile, current_path = queue.pop(0)
+        
+        # Get all possible jump destinations from current_tile
+        jump_destinations = []
+        for direction, neighbor in current_tile.get_neighbours().items():
+            if neighbor is not None and not neighbor.is_empty():
+                # There's a piece we can potentially jump over
+                landing = neighbor.get_neighbours().get(direction)
+                if landing is not None and landing.is_empty() and landing not in visited:
+                    jump_destinations.append(landing)
+        
+        # Process each jump destination
+        for dest in jump_destinations:
+            # Get coordinates of this destination
+            dest_coords = board_mapper.get_coord_of_tile(dest)
+            if dest_coords is None:
+                continue
+                
+            # Create the new path with this jump
+            new_path = current_path + [dest_coords]
+            
+            # If we've reached the target, return the path
+            if dest == end_tile:
+                return new_path
+            
+            # Otherwise, continue searching from this position
+            visited.add(dest)
+            queue.append((dest, new_path))
+    
+    # No path found
+    return None
+
+def trace_jump_paths(board_mapper, tile):
+    """Debug utility to trace all possible jump paths from a given tile"""
+    logger.info(f"Tracing all jump paths from tile: {tile}")
+    
+    paths = board_mapper.board.get_all_jump_paths(tile)
+    logger.info(f"Found {len(paths)} jump paths")
+    
+    for i, path in enumerate(paths):
+        path_coords = [board_mapper.get_coord_of_tile(t) for t in path]
+        logger.info(f"Path {i+1}: {path_coords}")
+    
+    return paths
 
 
 if __name__ == '__main__':

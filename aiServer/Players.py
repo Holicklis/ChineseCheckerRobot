@@ -35,39 +35,32 @@ def minimax_pruning(board: Board, depth: int, is_player1_turn: bool,
                     maximizing: bool = True,
                     alpha: int = -1_000_000_000,
                     beta: int = 1_000_000_000) -> tuple[int, list[Tile]]:
-    """
-    Returns (score, path) where path is a list of Tiles representing the move sequence 
-    (e.g. [origin, midJump1, midJump2, finalDest]).
-    If no moves exist, returns (score, []) or similar.
-    """
     # Base case
     if depth == 0 or board.has_game_ended():
-        # We add `depth` as a small factor so the AI might prefer faster wins
         return board.get_score(is_player1_turn, use_eval_func_1) + depth, []
 
     if maximizing:
         max_points = float('-inf')
         best_path = []
-        # Get the tiles for the current player
         tiles_for_player = board.get_player1_tiles() if is_player1_turn else board.get_player2_tiles()
         found_any_move = False
-        
+
         for tile_origin in tiles_for_player:
             possible_paths = []
-            # Include single-step moves:
+            # Single-step moves:
             for dest in board.get_all_valid_moves(tile_origin):
                 if heuristic(tile_origin, dest):
-                    # Create a move path with just origin and destination
                     possible_paths.append([tile_origin, dest])
-            # Include jump moves:
+
             jump_paths = board.get_all_jump_paths(tile_origin)
             for path in jump_paths:
-                if len(path) > 1 and all(heuristic(path[i], path[i+1]) for i in range(len(path)-1)):
+                if len(path) > 1:
                     possible_paths.append(path)
-            
+
             for path in possible_paths:
                 board.apply_path(path)
-                points, _ = minimax_pruning(board, depth - 1, is_player1_turn, heuristic, use_eval_func_1,
+                points, _ = minimax_pruning(board, depth - 1, is_player1_turn,
+                                            heuristic, use_eval_func_1,
                                             maximizing=False, alpha=alpha, beta=beta)
                 board.undo_path(path)
                 found_any_move = True
@@ -79,19 +72,19 @@ def minimax_pruning(board: Board, depth: int, is_player1_turn: bool,
                     break
             if beta <= alpha:
                 break
-        
+
         if not found_any_move:
             max_points = board.get_score(is_player1_turn, use_eval_func_1)
             best_path = []
         return max_points, best_path
 
     else:
-        # Minimizing branch: similar changes for opponent moves
+        # Similar changes apply for the minimizing branch:
         min_points = float('inf')
         best_path = []
         tiles_for_opponent = board.get_player2_tiles() if is_player1_turn else board.get_player1_tiles()
         found_any_move = False
-        
+
         for tile_origin in tiles_for_opponent:
             possible_paths = []
             for dest in board.get_all_valid_moves(tile_origin):
@@ -99,12 +92,13 @@ def minimax_pruning(board: Board, depth: int, is_player1_turn: bool,
                     possible_paths.append([tile_origin, dest])
             jump_paths = board.get_all_jump_paths(tile_origin)
             for path in jump_paths:
-                if len(path) > 1 and all(heuristic(path[i], path[i+1]) for i in range(len(path)-1)):
+                if len(path) > 1:
                     possible_paths.append(path)
-            
+
             for path in possible_paths:
                 board.apply_path(path)
-                points, _ = minimax_pruning(board, depth - 1, is_player1_turn, heuristic, use_eval_func_1,
+                points, _ = minimax_pruning(board, depth - 1, is_player1_turn,
+                                            heuristic, use_eval_func_1,
                                             maximizing=True, alpha=alpha, beta=beta)
                 board.undo_path(path)
                 found_any_move = True
@@ -116,7 +110,7 @@ def minimax_pruning(board: Board, depth: int, is_player1_turn: bool,
                     break
             if beta <= alpha:
                 break
-        
+
         if not found_any_move:
             min_points = board.get_score(is_player1_turn, use_eval_func_1)
             best_path = []
