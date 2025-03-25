@@ -1,6 +1,7 @@
 package hku.cs.fyp24057.chinesecheckerrobot;
 
 import android.graphics.Bitmap;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -105,6 +106,8 @@ public class IntegratedAIGameFragment extends Fragment {
     // Create a Handler for polling; we'll remove callbacks in onDestroyView
     private final Handler pollHandler = new Handler(Looper.getMainLooper());
 
+    private MediaPlayer soundPlayer;
+
     // Lifecycle
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -114,6 +117,8 @@ public class IntegratedAIGameFragment extends Fragment {
         detectionClient = new BoardDetectionClient(serverIp);
         robotController = RobotController.getInstance();
         robotController.setRobotIp(robotIp);
+
+        initSoundPlayer();
 
         Log.d(TAG, "Initialized with server IP: " + serverIp);
         Log.d(TAG, "Initialized with robot IP: " + robotIp);
@@ -166,13 +171,34 @@ public class IntegratedAIGameFragment extends Fragment {
         } else {
             requestPermissions(new String[]{android.Manifest.permission.CAMERA}, 1001);
         }
-    }
 
+        //sound
+
+    }
+    private void initSoundPlayer() {
+        // Create and configure the media player
+        soundPlayer = MediaPlayer.create(requireContext(), R.raw.button_click);
+        soundPlayer.setOnCompletionListener(mp -> {
+            // Reset the player when sound completes
+            mp.seekTo(0);
+        });
+    }
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         // Cancel any pending polling callbacks to avoid updating UI after view is destroyed
         pollHandler.removeCallbacksAndMessages(null);
+
+        // Stop and release media player
+        if (soundPlayer != null) {
+            soundPlayer.release();
+            soundPlayer = null;
+        }
+
+        // Cancel any pending polling callbacks
+        pollHandler.removeCallbacksAndMessages(null);
+
+        super.onDestroyView();
     }
 
     @Override
@@ -303,7 +329,10 @@ public class IntegratedAIGameFragment extends Fragment {
         });
 
         // Auto Play button – calls our poll‑based autoPlay
-        btnAutoPlay.setOnClickListener(v -> autoPlay());
+        btnAutoPlay.setOnClickListener(v -> {
+            playButtonSound();
+            autoPlay();
+        });
 
         // Initially disable these until each step is complete
         btnDetectCurrent.setEnabled(false);
@@ -331,6 +360,9 @@ public class IntegratedAIGameFragment extends Fragment {
             Toast.makeText(requireContext(), "Please capture empty board first", Toast.LENGTH_SHORT).show();
             return;
         }
+
+        // Play the sound effect
+        playButtonSound();
 
         safeRunOnUiThread(() -> tvAIResponse.setText("Starting autoPlay...\n1) Detecting current board...\n"));
         // Call detectCurrentBoard() as if the button was pressed
@@ -915,8 +947,8 @@ public class IntegratedAIGameFragment extends Fragment {
         rootView.requestFocus();
         rootView.setOnKeyListener((v, keyCode, event) -> {
             if (event.getAction() == KeyEvent.ACTION_DOWN &&
-                    (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER)) {
-                Log.d(TAG, "Enter key pressed -> autoPlay()!");
+                    (keyCode == KeyEvent.KEYCODE_E)) {
+                Log.d(TAG, "E/e key pressed -> autoPlay()!");
                 if (btnAutoPlay != null && btnAutoPlay.isEnabled()) {
                     btnAutoPlay.performClick();
                     return true;
@@ -925,5 +957,23 @@ public class IntegratedAIGameFragment extends Fragment {
             return false;
         });
         Log.d(TAG, "Keyboard listener set up");
+    }
+
+    //sound
+
+
+    private void playButtonSound() {
+        try {
+            if (soundPlayer != null) {
+                // If already playing, stop and reset
+                if (soundPlayer.isPlaying()) {
+                    soundPlayer.stop();
+                    soundPlayer.seekTo(0);
+                }
+                soundPlayer.start();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error playing sound", e);
+        }
     }
 }

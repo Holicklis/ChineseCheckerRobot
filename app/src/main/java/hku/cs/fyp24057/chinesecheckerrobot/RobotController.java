@@ -280,9 +280,6 @@ public class RobotController {
                             float diffX = originalX - currentX;
                             float diffY = originalY - currentY;
 
-                            // For first correction (attempt 2), just use the difference
-                            //now we change to for all attempts, we use the difference
-//                            if (attemptCount == 2) {
                             if (attemptCount >= 2) {
                                 adjustedX = originalX
                                         + diffX;
