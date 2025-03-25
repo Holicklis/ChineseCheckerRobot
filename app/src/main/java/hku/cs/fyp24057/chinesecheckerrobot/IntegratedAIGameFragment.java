@@ -129,7 +129,12 @@ public class IntegratedAIGameFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_integrated_ai_game, container, false);
+        View rootView = inflater.inflate(R.layout.fragment_integrated_ai_game, container, false);
+
+        // Make sure the root can take focus immediately
+        rootView.setFocusableInTouchMode(true);
+        rootView.requestFocus();
+        return rootView;
     }
 
     @Override
@@ -159,9 +164,18 @@ public class IntegratedAIGameFragment extends Fragment {
         btnResetArm = view.findViewById(R.id.btnResetArm);
         btnDetectPosition = view.findViewById(R.id.btnDetectPosition);
         btnAutoPlay = view.findViewById(R.id.btnAutoPlay);
-
+        view.setOnKeyListener((v, keyCode, event) -> {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_E) {
+                Log.d(TAG, "E/e key pressed -> autoPlay()!");
+                if (btnAutoPlay != null && btnAutoPlay.isEnabled()) {
+                    btnAutoPlay.performClick();
+                    return true; // consume event
+                }
+            }
+            return false; // let others handle it otherwise
+        });
         setupButtons();
-        setupKeyboardListener();
+//        setupKeyboardListener();
 
         // Start camera if permission granted
         if (ContextCompat.checkSelfPermission(requireContext(),
@@ -699,8 +713,10 @@ public class IntegratedAIGameFragment extends Fragment {
             // Step 1: Move to the first coordinate (pick up)
             CellCoordinate origin = path.get(0);
             if (!moveToAndWait(origin)) {
-                return false;
+//                return false;
+                updateProgress("Warning: Failed to reach pickup position accurately. Attempting to continue anyway.");
             }
+
 
             // Step 2: Close gripper (grab)
             updateProgress("Grabbing marble...");
@@ -711,7 +727,9 @@ public class IntegratedAIGameFragment extends Fragment {
             for (int i = 1; i < path.size(); i++) {
                 // If a move fails, retry this step by decrementing i
                 if (!moveToAndWait(path.get(i))) {
-                    i--;
+//                    i--;
+                    //tentatively we dont retry
+                    updateProgress("Warning: Failed to reach target position：" + i+". Attempting to continue anyway.");
                 }
             }
 
@@ -730,7 +748,7 @@ public class IntegratedAIGameFragment extends Fragment {
             Log.e(TAG, "Error during executeMove()", e);
             updateProgress("Error: " + e.getMessage());
             try {
-                robotController.controlGripper(false);
+                robotController.controlGripper(false); // Release gripper if an error occurs
             } catch (Exception ex) {
                 Log.e(TAG, "Error releasing gripper", ex);
             }
@@ -771,7 +789,7 @@ public class IntegratedAIGameFragment extends Fragment {
         );
 
         try {
-            if (!latch.await(30, TimeUnit.SECONDS)) {
+            if (!latch.await(300, TimeUnit.SECONDS)) {
                 updateProgress("Timeout waiting for movement!");
                 return false;
             }
@@ -947,7 +965,8 @@ public class IntegratedAIGameFragment extends Fragment {
         rootView.requestFocus();
         rootView.setOnKeyListener((v, keyCode, event) -> {
             if (event.getAction() == KeyEvent.ACTION_DOWN &&
-                    (keyCode == KeyEvent.KEYCODE_E)) {
+                    (keyCode == KeyEvent.KEYCODE_E || keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_F7)) {
+                Toast.makeText(requireContext(), "E/e key pressed -> autoPlay()!", Toast.LENGTH_SHORT).show();
                 Log.d(TAG, "E/e key pressed -> autoPlay()!");
                 if (btnAutoPlay != null && btnAutoPlay.isEnabled()) {
                     btnAutoPlay.performClick();
@@ -974,6 +993,17 @@ public class IntegratedAIGameFragment extends Fragment {
             }
         } catch (Exception e) {
             Log.e(TAG, "Error playing sound", e);
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Ensure the fragment's root view regains focus when resumed
+        View rootView = getView();
+        if (rootView != null) {
+            rootView.setFocusableInTouchMode(true);
+            rootView.requestFocus();
         }
     }
 }

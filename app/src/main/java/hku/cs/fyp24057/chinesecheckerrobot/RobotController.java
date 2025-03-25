@@ -33,7 +33,7 @@ public class RobotController {
     private static final float DEFAULT_SPEED = 2f;  // Speed setting
     private static final int MOVEMENT_DELAY_MS = 2500;
     private static final int SHORT_DELAY_MS = 2500;
-    private static final float DEFAULT_POSITION_TOLERANCE = 2.0f;
+    private static final float DEFAULT_POSITION_TOLERANCE = 2.3f;
     private static final int DEFAULT_MAX_RETRIES = 5;
     private static final int VERIFICATION_DELAY_MS = 500;
     private static final float SAFE_Z = -60f;
@@ -218,7 +218,7 @@ public class RobotController {
                             Math.abs(currentY - targetY) <= tolerance &&
                             Math.abs(currentZ - targetZ) <= tolerance;
 
-            Log.d(TAG, String.format("Position verification: Target(%.2f,%.2f,%.2f) Current(%.2f,%.2f,%.2f) Result: %s",
+            Log.d(TAG, String.format("Position verification: Target(%.2f, %.2f,%.2f) Current(%.2f,%.2f,%.2f) Result: %s",
                     targetX, targetY, targetZ, currentX, currentY, currentZ, isPositionCorrect));
 
             return isPositionCorrect;
