@@ -107,7 +107,7 @@ def preprocess_image(image, max_dim=1600, debug=False): #1600 unit: pixel
 # Marble Detection Parameters (Predefined)
 # ---------------------------
 # Predefined HSV ranges for green marbles
-GREEN_LOWER = np.array([36, 0, 0])      # [H, S, V]
+GREEN_LOWER = np.array([30, 60, 50])      # [H, S, V]
 GREEN_UPPER = np.array([86, 255, 255])
 
 # Predefined HSV ranges for red marbles (two ranges to cover hue wrap-around)
@@ -129,7 +129,7 @@ MARBLE_HOUGH_DP = 1.1
 MARBLE_HOUGH_MIN_DIST = 30
 MARBLE_HOUGH_PARAM1 = 50   # Canny high threshold
 MARBLE_HOUGH_PARAM2 = 15   # Accumulator threshold
-MARBLE_HOUGH_MIN_RADIUS = 10
+MARBLE_HOUGH_MIN_RADIUS = 15
 MARBLE_HOUGH_MAX_RADIUS = 30
 
 # Base threshold for marble to cell assignment
@@ -142,68 +142,108 @@ def detect_board(resized_image, debug=False):
     """
     Attempt to detect the hexagonal outline of the board using contour detection.
     """
+    # 1. Convert to HSV (to filter out yellow spacer)
+    hsv = cv2.cvtColor(resized_image, cv2.COLOR_BGR2HSV)
+
+    # 2. Define a rough "yellow" range (you may need to tweak these)
+    #    You can adjust the hue [20..35], saturation, and value range 
+    #    depending on your actual spacer color and lighting.
+    yellow_lower = np.array([20, 100, 100])
+    yellow_upper = np.array([35, 255, 255])
+
+    # 3. Create a mask for yellow
+    yellow_mask = cv2.inRange(hsv, yellow_lower, yellow_upper)
+
+    # 4. Black out the yellow regions in the original image
+    #    (where mask is > 0, set those pixels to black)
+    masked_image = resized_image.copy()
+    masked_image[yellow_mask > 0] = (0, 0, 0)
     
-    #increase brightness
-    gray = cv2.cvtColor(resized_image, cv2.COLOR_BGR2GRAY)
-    
-    # Apply Gaussian blur
+    cv2.imwrite("debug_images/yellow_removed.jpg", masked_image)
+
+    if debug:
+        cv2.imwrite("debug_images/yellow_removed.jpg", masked_image)
+        cv2.imshow("Yellow Removed", masked_image)
+
+    # 5. Now continue with your usual grayscale, blur, threshold, etc.
+    gray = cv2.cvtColor(masked_image, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     
-    # Adaptive Thresholding
-    thresholded = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-    
+    # For example:
+    thresholded = cv2.adaptiveThreshold(
+        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+        cv2.THRESH_BINARY, 11, 2
+    )
     cv2.imwrite('debug_images/thresholded.jpg', thresholded)
-
+    if debug:
+        cv2.imshow("Thresholded", thresholded)
+    
     # Canny Edge Detection
     edges = cv2.Canny(blurred, 50, 150)
-    
-    # cv2.imshow("Thresholded", thresholded)
+    cv2.imwrite('debug_images/edges.jpg', edges)
     if debug:
         cv2.imshow("Edges", edges)
-
-    # Morphological Closing to close gaps
-    kernel = np.ones((7, 7), np.uint8)
-    closed_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
     
-    cv2.imwrite('debug_images/Edges.jpg', edges)
+    # Morphological Closing to close gaps in edges
+    kernel = np.ones((5, 5), np.uint8)
+    closed_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    cv2.imwrite('debug_images/closed.jpg', closed_edges)
     if debug:
         cv2.imshow("Closed Edges", closed_edges)
-    cv2.imwrite('debug_images/closed.jpg', closed_edges)
-
+    
+    # Combined edges - bitwise AND of thresholded and edges (optional)
     combined_edges = cv2.bitwise_and(thresholded, edges)
-    # cv2.imshow("Combined Edges", combined_edges)
-
-    # Find Contours
-    contours, _ = cv2.findContours(closed_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    if not contours:
-        with open('debug_info_board.txt', 'a') as f:
-            f.write("No contours found\n")
-        return None
-
+    cv2.imwrite('debug_images/combined_edges.jpg', combined_edges)
+    if debug:
+        cv2.imshow("Combined Edges", combined_edges)
+    
+    # Find Contours on the closed edge image
+    contours, _ = cv2.findContours(
+        closed_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+    
+    # Draw all found contours for debugging
+    debug_contours = resized_image.copy()
+    cv2.drawContours(debug_contours, contours, -1, (0, 255, 0), 2)
+    cv2.imwrite('debug_images/all_contours.jpg', debug_contours)
+    if debug:
+        cv2.imshow("All Contours", debug_contours)
+    
     board_contour = None
     max_area = 0
+    debug_polygons = resized_image.copy()
+    
+    # Iterate over contours to approximate polygons and find the board
     for contour in contours:
         area = cv2.contourArea(contour)
         min_contour_area = resized_image.shape[0] * resized_image.shape[1] * 0.05
         if area < min_contour_area:
             continue
-
+        
         peri = cv2.arcLength(contour, True)
         approx = cv2.approxPolyDP(contour, 0.015 * peri, True)
-
-        # Check for ~6 sides (hexagon), but allow some flexibility
+        
+        # Draw approximated polygon for debug purposes
+        cv2.drawContours(debug_polygons, [approx], -1, (255, 0, 0), 2)
+        
+        # Check for a shape that might correspond to a hex board
         if 6 <= len(approx) <= 18 and area > max_area:
             board_contour = contour
             max_area = area
 
+    cv2.imwrite('debug_images/approx_polygons.jpg', debug_polygons)
+    if debug:
+        cv2.imshow("Approximated Polygons", debug_polygons)
+    
+    # If a valid board contour is found, draw it on the image
     if board_contour is not None:
         logging.info(f"Board contour area: {max_area}")
-        cv2.drawContours(resized_image, [board_contour], -1, (0, 255, 0), 2)
+        detected_board = resized_image.copy()
+        cv2.drawContours(detected_board, [board_contour], -1, (0, 255, 0), 2)
+        cv2.imwrite('debug_images/detected_board.jpg', detected_board)
         if debug:
-            cv2.imshow("Detected Board", resized_image)
+            cv2.imshow("Detected Board", detected_board)
         logging.info("Hexagonal board contour found.")
-        
         with open('debug_info_board.txt', 'a') as f:
             f.write(f"Board contour area: {max_area}\n")
     else:
@@ -211,6 +251,7 @@ def detect_board(resized_image, debug=False):
         print("No board detected")
         with open('debug_info_board.txt', 'a') as f:
             f.write("No board detected\n")
+    
     return board_contour
 
 # ---------------------------

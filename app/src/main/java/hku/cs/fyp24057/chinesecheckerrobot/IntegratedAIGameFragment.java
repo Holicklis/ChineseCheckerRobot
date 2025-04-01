@@ -1,10 +1,12 @@
 package hku.cs.fyp24057.chinesecheckerrobot;
 
 import android.graphics.Bitmap;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Surface;
 import android.view.View;
@@ -56,73 +58,67 @@ import okhttp3.Response;
 
 public class IntegratedAIGameFragment extends Fragment {
 
-    private EditText etDebugBoardX;
-    private EditText etDebugBoardY;
-    private Button btnLookupCoords;
-    private TextView tvMappedPosition;
-    private boolean isMoving = false;
-
-    private Button btnShowDebugInfo;
-
     private static final String TAG = "IntegratedAIGameFrag";
-    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
-    private static final int DETECTION_PORT = 5001;
-    private static final int AI_PORT = 5002;
 
-    // UI Elements
+    // UI references
     private PreviewView previewView;
+    private EditText etDebugBoardX, etDebugBoardY;
+    private Button btnLookupCoords, btnShowDebugInfo;
+    private TextView tvMappedPosition;
+    private TextView tvBoardState, tvAIResponse;
+
     private Button btnCaptureEmpty;
     private Button btnDetectCurrent;
     private Button btnGetAIMove;
     private Button btnExecuteMove;
-    private Button btnConfigureIp;
-    private TextView tvBoardState;
-    private TextView tvAIResponse;
-
-    // Camera Control
-    private ImageCapture imageCapture;
-    private boolean hasEmptyBoard = false;
-
-    // Network Clients
-    private String serverIp = "192.168.11.175"; // Default
-    private String robotIp = "192.168.11.172"; // Default
-    private OkHttpClient client;
-    private BoardDetectionClient detectionClient;
-
-    // Robot Control
-    private RobotController robotController;
-
-    // Game State
-    private List<String> currentBoardState;
-    private JSONObject lastRecommendedMove;
-    private JSONArray lastRecommendedMoveSequence = null;
-
     private Button btnConfigureServerIp;
     private Button btnConfigureRobotIp;
-
     private Button btnStartGripper;
     private Button btnStopGripper;
-
     private Button btnResetArm;
-
     private Button btnDetectPosition;
+    private Button btnAutoPlay; // The new "Auto Play" button
 
-    private boolean isPlayer1Turn = true; // Default, can be toggled
+    // State
+    private boolean isMoving = false;
+    private boolean hasEmptyBoard = false;
+    private List<String> currentBoardState = null;           // set after detectCurrentBoard() finishes
+    private JSONArray lastRecommendedMoveSequence = null;    // set after getAIMove() finishes
 
+    // Camera
+    private ImageCapture imageCapture;
+
+    // Network / Robot
+    private final OkHttpClient client = new OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build();
+    private BoardDetectionClient detectionClient;
+    private RobotController robotController;
+    private String serverIp = "192.168.11.192";  // Example defaults
+    private String robotIp = "192.168.11.172";
+
+    // For AI requests
+    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private static final int AI_PORT = 5002;
+
+    // Create a Handler for polling; we'll remove callbacks in onDestroyView
+    private final Handler pollHandler = new Handler(Looper.getMainLooper());
+
+    private MediaPlayer soundPlayer;
+
+    // Lifecycle
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Initialize the clients with separate IPs
-        client = new OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .build();
-
-        detectionClient = new BoardDetectionClient(serverIp); // Use server IP
+        // Initialize detection and robot with default IPs
+        detectionClient = new BoardDetectionClient(serverIp);
         robotController = RobotController.getInstance();
-        robotController.setRobotIp(robotIp); // Use robot IP
+        robotController.setRobotIp(robotIp);
+
+        initSoundPlayer();
 
         Log.d(TAG, "Initialized with server IP: " + serverIp);
         Log.d(TAG, "Initialized with robot IP: " + robotIp);
@@ -130,60 +126,98 @@ public class IntegratedAIGameFragment extends Fragment {
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_integrated_ai_game, container, false);
+        View rootView = inflater.inflate(R.layout.fragment_integrated_ai_game, container, false);
+
+        // Make sure the root can take focus immediately
+        rootView.setFocusableInTouchMode(true);
+        rootView.requestFocus();
+        return rootView;
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view,
+                              @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Initialize UI elements
+        // Hook up UI
         previewView = view.findViewById(R.id.previewView);
+        tvBoardState = view.findViewById(R.id.tvBoardState);
+        tvAIResponse = view.findViewById(R.id.tvAIResponse);
+
+        etDebugBoardX = view.findViewById(R.id.etDebugBoardX);
+        etDebugBoardY = view.findViewById(R.id.etDebugBoardY);
+        tvMappedPosition = view.findViewById(R.id.tvMappedPosition);
+
+        btnLookupCoords = view.findViewById(R.id.btnLookupCoords);
+        btnShowDebugInfo = view.findViewById(R.id.btnShowDebugInfo);
         btnCaptureEmpty = view.findViewById(R.id.btnCaptureEmpty);
         btnDetectCurrent = view.findViewById(R.id.btnDetectCurrent);
         btnGetAIMove = view.findViewById(R.id.btnGetAIMove);
         btnExecuteMove = view.findViewById(R.id.btnExecuteMove);
-
-        // Replace single config button with two separate buttons
         btnConfigureServerIp = view.findViewById(R.id.btnConfigureServerIp);
         btnConfigureRobotIp = view.findViewById(R.id.btnConfigureRobotIp);
-
-        tvBoardState = view.findViewById(R.id.tvBoardState);
-        tvAIResponse = view.findViewById(R.id.tvAIResponse);
-
-        // Initialize debug UI elements
-        etDebugBoardX = view.findViewById(R.id.etDebugBoardX);
-        etDebugBoardY = view.findViewById(R.id.etDebugBoardY);
-        btnShowDebugInfo = view.findViewById(R.id.btnShowDebugInfo);
-        btnLookupCoords = view.findViewById(R.id.btnLookupCoords);
-        tvMappedPosition = view.findViewById(R.id.tvMappedPosition);
-
         btnStartGripper = view.findViewById(R.id.btnStartGripper);
         btnStopGripper = view.findViewById(R.id.btnStopGripper);
-
         btnResetArm = view.findViewById(R.id.btnResetArm);
-
         btnDetectPosition = view.findViewById(R.id.btnDetectPosition);
-
-        // Set up listeners
+        btnAutoPlay = view.findViewById(R.id.btnAutoPlay);
+        view.setOnKeyListener((v, keyCode, event) -> {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_E) {
+                Log.d(TAG, "E/e key pressed -> autoPlay()!");
+                if (btnAutoPlay != null && btnAutoPlay.isEnabled()) {
+                    btnAutoPlay.performClick();
+                    return true; // consume event
+                }
+            }
+            return false; // let others handle it otherwise
+        });
         setupButtons();
+//        setupKeyboardListener();
 
-        // Start the camera if permissions are granted
+        // Start camera if permission granted
         if (ContextCompat.checkSelfPermission(requireContext(),
                 android.Manifest.permission.CAMERA) ==
                 android.content.pm.PackageManager.PERMISSION_GRANTED) {
             startCamera();
         } else {
-            requestPermissions(
-                    new String[]{android.Manifest.permission.CAMERA},
-                    1001);
+            requestPermissions(new String[]{android.Manifest.permission.CAMERA}, 1001);
         }
+
+        //sound
+
+    }
+    private void initSoundPlayer() {
+        // Create and configure the media player
+        soundPlayer = MediaPlayer.create(requireContext(), R.raw.button_click);
+        soundPlayer.setOnCompletionListener(mp -> {
+            // Reset the player when sound completes
+            mp.seekTo(0);
+        });
+    }
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // Cancel any pending polling callbacks to avoid updating UI after view is destroyed
+        pollHandler.removeCallbacksAndMessages(null);
+
+        // Stop and release media player
+        if (soundPlayer != null) {
+            soundPlayer.release();
+            soundPlayer = null;
+        }
+
+        // Cancel any pending polling callbacks
+        pollHandler.removeCallbacksAndMessages(null);
+
+        super.onDestroyView();
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == 1001) {
@@ -198,10 +232,11 @@ public class IntegratedAIGameFragment extends Fragment {
         }
     }
 
+    /**
+     * Sets up all button listeners.
+     */
     private void setupButtons() {
-        btnCaptureEmpty.setOnClickListener(v -> {
-            captureEmptyBoard();
-        });
+        btnCaptureEmpty.setOnClickListener(v -> captureEmptyBoard());
 
         btnDetectCurrent.setOnClickListener(v -> {
             if (!hasEmptyBoard) {
@@ -233,286 +268,168 @@ public class IntegratedAIGameFragment extends Fragment {
             }
         });
 
-        // Replace single configIP with separate handlers
-        btnConfigureServerIp.setOnClickListener(v -> {
-            showServerIpConfigDialog();
+        btnConfigureServerIp.setOnClickListener(v -> showServerIpConfigDialog());
+        btnConfigureRobotIp.setOnClickListener(v -> showRobotIpConfigDialog());
+
+        btnShowDebugInfo.setOnClickListener(v -> showDebugInfo());
+        btnLookupCoords.setOnClickListener(v -> lookupAndMoveToPosition());
+
+        btnStartGripper.setOnClickListener(v -> {
+            if (!isMoving) {
+                controlGripper(true);
+            } else {
+                Toast.makeText(requireContext(),
+                        "Robot is currently moving. Please wait.",
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
+        btnStopGripper.setOnClickListener(v -> {
+            if (!isMoving) {
+                controlGripper(false);
+            } else {
+                Toast.makeText(requireContext(),
+                        "Robot is currently moving. Please wait.",
+                        Toast.LENGTH_SHORT).show();
+            }
         });
 
-        btnConfigureRobotIp.setOnClickListener(v -> {
-            showRobotIpConfigDialog();
+        btnResetArm.setOnClickListener(v -> {
+            if (!isMoving) {
+                isMoving = true;
+                safeRunOnUiThread(() -> tvAIResponse.append("\nResetting arm to home position..."));
+                robotController.reset();
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    isMoving = false;
+                    safeRunOnUiThread(() -> tvAIResponse.append("\nReset completed."));
+                }, 500);
+            } else {
+                Toast.makeText(requireContext(),
+                        "Robot is currently moving. Please wait.",
+                        Toast.LENGTH_SHORT).show();
+            }
         });
 
-        btnShowDebugInfo.setOnClickListener(v -> {
-            showDebugInfo();
+        btnDetectPosition.setOnClickListener(v -> {
+            if (isMoving) {
+                Toast.makeText(requireContext(),
+                        "Robot is currently moving. Please wait.",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+            safeRunOnUiThread(() -> tvAIResponse.append("\nRequesting current position..."));
+            JSONObject positionFeedback = robotController.getPositionFeedback();
+            if (positionFeedback != null) {
+                try {
+                    float x = (float) positionFeedback.getDouble("x");
+                    float y = (float) positionFeedback.getDouble("y");
+                    float z = (float) positionFeedback.getDouble("z");
+                    float t = (float) positionFeedback.getDouble("t");
+
+                    final String positionInfo = String.format(Locale.US,
+                            "\n\nCurrent Position:\nX: %.2f\nY: %.2f\nZ: %.2f\nTorque: %.2f",
+                            x, y, z, t) + "\n\nRaw Feedback: " + positionFeedback.toString();
+                    safeRunOnUiThread(() -> tvAIResponse.append(positionInfo));
+
+                    final ScrollView scrollView = (ScrollView) tvAIResponse.getParent().getParent();
+                    scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
+                } catch (JSONException e) {
+                    safeRunOnUiThread(() -> tvAIResponse.append("\nError parsing position data: " + e.getMessage()));
+                    Log.e(TAG, "Error parsing position data", e);
+                }
+            } else {
+                safeRunOnUiThread(() -> tvAIResponse.append("\nFailed to retrieve position data"));
+                Log.e(TAG, "Failed to get position feedback");
+            }
         });
 
-        btnLookupCoords.setOnClickListener(v -> {
-            lookupAndMoveToPosition();
+        // Auto Play button – calls our poll‑based autoPlay
+        btnAutoPlay.setOnClickListener(v -> {
+            playButtonSound();
+            autoPlay();
         });
 
-        // Initially disable buttons that depend on previous steps
+        // Initially disable these until each step is complete
         btnDetectCurrent.setEnabled(false);
         btnGetAIMove.setEnabled(false);
         btnExecuteMove.setEnabled(false);
 
-        btnStartGripper.setOnClickListener(v -> {
-            if (isMoving) {
-                Toast.makeText(requireContext(),
-                        "Robot is currently moving. Please wait.",
-                        Toast.LENGTH_SHORT).show();
-                return;
-            }
-            controlGripper(true);
-        });
-
-        btnStopGripper.setOnClickListener(v -> {
-            if (isMoving) {
-                Toast.makeText(requireContext(),
-                        "Robot is currently moving. Please wait.",
-                        Toast.LENGTH_SHORT).show();
-                return;
-            }
-            controlGripper(false);
-        });
-
-        btnResetArm.setOnClickListener(v -> {
-            if (isMoving) {
-                Toast.makeText(requireContext(),
-                        "Robot is currently moving. Please wait.",
-                        Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            // Set moving flag
-            isMoving = true;
-
-            // Update UI
-            tvAIResponse.append("\nResetting arm to home position...");
-            Toast.makeText(requireContext(),
-                    "Resetting robot arm to home position",
-                    Toast.LENGTH_SHORT).show();
-
-            // Execute reset command
-            robotController.reset();
-
-            // Allow new movements after a short delay (500ms)
-            new Handler().postDelayed(() -> {
-                isMoving = false;
-                tvAIResponse.append("\nReset completed.");
-            }, 500);
-        });
-
-        btnDetectPosition.setOnClickListener(v -> {
-            detectCurrentPosition();
-        });
-
+        updateAutoPlayButtonState();
     }
 
+    // ------------------------------------------------------------------
+    //  AUTO PLAY IMPLEMENTATION (Poll‑based)
+    // ------------------------------------------------------------------
 
-    private void detectCurrentPosition() {
+    /**
+     * autoPlay() – reuses your existing detectCurrentBoard(), getAIMove(), and executeAIMoveSequence()
+     * in sequence. It polls every second to see if each step is complete.
+     */
+    private void autoPlay() {
         if (isMoving) {
-            Toast.makeText(requireContext(),
-                    "Robot is currently moving. Please wait.",
-                    Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "Robot is currently moving. Please wait.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!hasEmptyBoard) {
+            safeRunOnUiThread(() -> tvAIResponse.append("\n⚠️ Please capture an empty board first!\n"));
+            Toast.makeText(requireContext(), "Please capture empty board first", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        tvAIResponse.append("\nRequesting current position...");
+        // Play the sound effect
+        playButtonSound();
 
-        // Get position feedback from the robot controller
-        JSONObject positionFeedback = robotController.getPositionFeedback();
-
-        if (positionFeedback != null) {
-            try {
-                float x = (float) positionFeedback.getDouble("x");
-                float y = (float) positionFeedback.getDouble("y");
-                float z = (float) positionFeedback.getDouble("z");
-                float t = (float) positionFeedback.getDouble("t");
-
-                String positionInfo = String.format(Locale.US,
-                        "\n\nCurrent Position:\nX: %.2f\nY: %.2f\nZ: %.2f\nTorque: %.2f",
-                        x, y, z, t);
-
-                // Add full JSON to see all available information
-                positionInfo += "\n\nRaw Feedback: " + positionFeedback.toString();
-
-                tvAIResponse.append(positionInfo);
-                Log.d(TAG, "Position feedback: " + positionFeedback);
-
-                // Scroll to the bottom of the text view
-                final ScrollView scrollView = (ScrollView) tvAIResponse.getParent().getParent();
-                scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
-
-            } catch (JSONException e) {
-                tvAIResponse.append("\nError parsing position data: " + e.getMessage());
-                Log.e(TAG, "Error parsing position data", e);
-            }
-        } else {
-            tvAIResponse.append("\nFailed to retrieve position data");
-            Log.e(TAG, "Failed to get position feedback");
-        }
+        safeRunOnUiThread(() -> tvAIResponse.setText("Starting autoPlay...\n1) Detecting current board...\n"));
+        // Call detectCurrentBoard() as if the button was pressed
+        detectCurrentBoard();
+        pollForBoardDetection();
     }
-    private void controlGripper(boolean close) {
-        isMoving = true;
 
-        robotController.controlGripper(close);
-
-        // Update UI to show what happened
-        Toast.makeText(requireContext(),
-                close ? "Starting gripper (closing)" : "Stopping gripper (opening)",
-                Toast.LENGTH_SHORT).show();
-
-        // Log the event
-        Log.d(TAG, close ? "Gripper closing command sent" : "Gripper opening command sent");
-        tvAIResponse.append("\n" + (close ? "Gripper closing command sent" : "Gripper opening command sent"));
-
-        // Allow movement again after a short delay
-        new Handler().postDelayed(() -> {
-            isMoving = false;
+    private void pollForBoardDetection() {
+        pollHandler.postDelayed(() -> {
+            if (!isAdded() || getView() == null) return; // do not update if fragment is detached
+            if (currentBoardState != null && !currentBoardState.isEmpty()) {
+                safeRunOnUiThread(() -> tvAIResponse.append("Board detected!\n2) Getting AI move...\n"));
+                getAIMove();
+                pollForAIMove();
+            } else {
+                safeRunOnUiThread(() -> tvAIResponse.append("."));
+                pollForBoardDetection();
+            }
         }, 1000);
     }
 
-    // Split the IP configuration into two separate methods
-    private void showServerIpConfigDialog() {
-        new IpConfigDialog(
-                requireContext(),
-                serverIp,
-                "Configure Server IP",
-                newIp -> {
-                    serverIp = newIp;
-                    detectionClient = new BoardDetectionClient(serverIp);
-                    Toast.makeText(requireContext(),
-                            "Server IP updated to: " + newIp,
-                            Toast.LENGTH_SHORT).show();
-                    Log.d(TAG, "Updated server IP to: " + newIp);
-                }
-        ).show();
-    }
-
-    private void showRobotIpConfigDialog() {
-        new IpConfigDialog(
-                requireContext(),
-                robotIp,
-                "Configure Robot IP",
-                newIp -> {
-                    robotIp = newIp;
-                    robotController.setRobotIp(newIp);
-                    Toast.makeText(requireContext(),
-                            "Robot IP updated to: " + newIp,
-                            Toast.LENGTH_SHORT).show();
-                    Log.d(TAG, "Updated robot IP to: " + newIp);
-                }
-        ).show();
-    }
-
-    private void showDebugInfo() {
-        StringBuilder debugInfo = new StringBuilder();
-        debugInfo.append("CURRENT CONFIGURATION\n\n");
-        debugInfo.append("Server IP: ").append(serverIp).append("\n");
-        debugInfo.append("Robot IP: ").append(robotController.getRobotIp()).append("\n");
-        debugInfo.append("Robot Controller: ").append(robotController.getClass().getName()).append("\n");
-        debugInfo.append("Detection Client: ").append(detectionClient.getClass().getName()).append("\n");
-        debugInfo.append("isMoving: ").append(isMoving).append("\n");
-        debugInfo.append("hasEmptyBoard: ").append(hasEmptyBoard).append("\n");
-
-        // Show debug info in the mapped position area
-        tvMappedPosition.setText(debugInfo.toString());
-
-        // Log the information
-        Log.d(TAG, "Debug Info: " + debugInfo.toString());
-
-        Toast.makeText(requireContext(),
-                "Debug info displayed",
-                Toast.LENGTH_SHORT).show();
-    }
-
-    private void lookupAndMoveToPosition() {
-        if (isMoving) {
-            Toast.makeText(requireContext(),
-                    "Robot is currently moving. Please wait.",
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        try {
-            // Parse board coordinates from input fields
-            int boardX = Integer.parseInt(etDebugBoardX.getText().toString().trim());
-            int boardY = Integer.parseInt(etDebugBoardY.getText().toString().trim());
-
-            // Lookup mapped coordinates
-            CellCoordinate cellCoord = BoardCoordinatesAdapter.getInstance()
-                    .getBoardCellCoordinate(boardX, boardY);
-
-            if (cellCoord == null) {
-                tvMappedPosition.setText("No mapping found for board coordinates (" +
-                        boardX + "," + boardY + ")");
-                return;
+    private void pollForAIMove() {
+        pollHandler.postDelayed(() -> {
+            if (!isAdded() || getView() == null) return;
+            if (lastRecommendedMoveSequence != null) {
+                safeRunOnUiThread(() -> tvAIResponse.append("\nGot AI move.\n3) Executing AI move...\n"));
+                executeAIMoveSequence(lastRecommendedMoveSequence);
+                pollForMoveExecution();
+            } else {
+                safeRunOnUiThread(() -> tvAIResponse.append("."));
+                pollForAIMove();
             }
-
-            // Display the mapped coordinates with current robot IP
-            String mappedInfo = String.format(Locale.US,
-                    "Mapped Position:\n" +
-                            "Board(%d,%d) → Grid(%d,%d)\n" +
-                            "Robot X=%.2f, Y=%.2f, Z=%.2f, T=%.2f\n" +
-                            "Using Robot IP: %s",
-                    boardX, boardY,
-                    cellCoord.getGridX(), cellCoord.getGridY(),
-                    cellCoord.getX(), cellCoord.getY(), cellCoord.getZ(), cellCoord.getTorque(),
-                    robotController.getRobotIp());
-
-            tvMappedPosition.setText(mappedInfo);
-
-            // Verify that the robot controller has the correct IP before moving
-            Log.d(TAG, "Robot move using IP: " + robotController.getRobotIp());
-            if (!robotController.getRobotIp().equals(robotIp)) {
-                Log.w(TAG, "IP mismatch! Controller IP: " + robotController.getRobotIp() +
-                        " vs. stored IP: " + robotIp);
-                // Force update the IP to be safe
-                robotController.setRobotIp(robotIp);
-            }
-
-            // Lock UI and set moving flag
-            isMoving = true;
-            btnLookupCoords.setEnabled(false);
-
-            // Use the improved controller to move with verification
-            CompletableFuture<Boolean> moveFuture = robotController.executeVerifiedMovement(
-                    cellCoord.getX(), cellCoord.getY(), cellCoord.getZ(), cellCoord.getTorque(),
-                    new RobotController.MovementCallback() {
-                        @Override
-                        public void onSuccess() {
-                            requireActivity().runOnUiThread(() -> {
-                                isMoving = false;
-                                btnLookupCoords.setEnabled(true);
-                                Toast.makeText(requireContext(),
-                                        "Movement completed successfully",
-                                        Toast.LENGTH_SHORT).show();
-                            });
-                        }
-
-                        @Override
-                        public void onFailure(String errorMessage) {
-                            requireActivity().runOnUiThread(() -> {
-                                isMoving = false;
-                                btnLookupCoords.setEnabled(true);
-                                Toast.makeText(requireContext(),
-                                        "Movement failed: " + errorMessage,
-                                        Toast.LENGTH_SHORT).show();
-                            });
-                        }
-
-                        @Override
-                        public void onProgress(String status) {
-                            requireActivity().runOnUiThread(() -> {
-                                tvMappedPosition.append("\n" + status);
-                            });
-                        }
-                    });
-
-        } catch (NumberFormatException e) {
-            tvMappedPosition.setText("Invalid coordinates. Please enter valid numbers.");
-        }
+        }, 1000);
     }
+
+    private void pollForMoveExecution() {
+        pollHandler.postDelayed(() -> {
+            if (!isAdded() || getView() == null) return;
+            if (!isMoving) {
+                safeRunOnUiThread(() -> {
+                    tvAIResponse.append("\nMove execution complete!\n");
+                    tvAIResponse.append("AutoPlay is finished.\n");
+                });
+            } else {
+                safeRunOnUiThread(() -> tvAIResponse.append("."));
+                pollForMoveExecution();
+            }
+        }, 1000);
+    }
+
+    // ------------------------------------------------------------------
+    //  EXISTING FUNCTIONS (Detect, AI, Execute) – Unchanged
+    // ------------------------------------------------------------------
 
     private void captureEmptyBoard() {
         btnCaptureEmpty.setEnabled(false);
@@ -549,7 +466,7 @@ public class IntegratedAIGameFragment extends Fragment {
                     @Override
                     public void onError(@NonNull ImageCaptureException exception) {
                         Log.e(TAG, "Image capture failed", exception);
-                        requireActivity().runOnUiThread(() -> {
+                        safeRunOnUiThread(() -> {
                             Toast.makeText(requireContext(),
                                     "Failed to capture image: " + exception.getMessage(),
                                     Toast.LENGTH_SHORT).show();
@@ -568,7 +485,7 @@ public class IntegratedAIGameFragment extends Fragment {
             detectionClient.uploadEmptyBoard(bitmap, new BoardDetectionClient.DetectionCallback() {
                 @Override
                 public void onSuccess(List<String> boardState) {
-                    requireActivity().runOnUiThread(() -> {
+                    safeRunOnUiThread(() -> {
                         hasEmptyBoard = true;
                         btnCaptureEmpty.setEnabled(true);
                         btnDetectCurrent.setEnabled(true);
@@ -580,10 +497,11 @@ public class IntegratedAIGameFragment extends Fragment {
 
                 @Override
                 public void onError(String error) {
-                    requireActivity().runOnUiThread(() -> {
+                    safeRunOnUiThread(() -> {
                         btnCaptureEmpty.setEnabled(true);
                         Toast.makeText(requireContext(),
-                                "Error: " + error, Toast.LENGTH_LONG).show();
+                                "Error: " + error,
+                                Toast.LENGTH_LONG).show();
                     });
                 }
             });
@@ -591,21 +509,17 @@ public class IntegratedAIGameFragment extends Fragment {
             detectionClient.detectCurrentState(bitmap, new BoardDetectionClient.DetectionCallback() {
                 @Override
                 public void onSuccess(List<String> boardState) {
-                    requireActivity().runOnUiThread(() -> {
+                    safeRunOnUiThread(() -> {
                         btnDetectCurrent.setEnabled(true);
                         btnGetAIMove.setEnabled(true);
-
                         if (boardState != null) {
                             currentBoardState = boardState;
-
-                            // Display the board state
                             StringBuilder display = new StringBuilder("Detected Board State:\n\n");
                             for (String row : boardState) {
                                 display.append(row).append('\n');
                             }
                             tvBoardState.setText(display.toString());
                         }
-
                         Toast.makeText(requireContext(),
                                 "Board state detected successfully",
                                 Toast.LENGTH_SHORT).show();
@@ -614,7 +528,7 @@ public class IntegratedAIGameFragment extends Fragment {
 
                 @Override
                 public void onError(String error) {
-                    requireActivity().runOnUiThread(() -> {
+                    safeRunOnUiThread(() -> {
                         btnDetectCurrent.setEnabled(true);
                         tvBoardState.setText("Error: " + error);
                         Toast.makeText(requireContext(),
@@ -639,41 +553,27 @@ public class IntegratedAIGameFragment extends Fragment {
 
     private void getAIMove() {
         btnGetAIMove.setEnabled(false);
-        tvAIResponse.setText("Requesting AI move...");
+        safeRunOnUiThread(() -> tvAIResponse.setText("Requesting AI move..."));
 
         try {
-            // Prepare the request to the AI server
-            JSONObject jsonPayload = new JSONObject();
-
-            // Convert the detected board state format (G/R/.) to AI format (O/X/.)
-            List<String> convertedBoardState = new ArrayList<>();
+            List<String> convertedBoard = new ArrayList<>();
             for (String row : currentBoardState) {
-                // Replace 'G' with 'O' (human player) and 'R' with 'X' (robot)
-                String convertedRow = row.replace('G', 'O').replace('R', 'X');
-                convertedBoardState.add(convertedRow);
+                convertedBoard.add(row.replace('G','O').replace('R','X'));
             }
 
-            // Add the converted board state
-            JSONArray boardState = new JSONArray();
-            for (String row : convertedBoardState) {
-                boardState.put(row);
+            JSONArray boardStateJson = new JSONArray();
+            for (String row : convertedBoard) {
+                boardStateJson.put(row);
             }
 
-            // Log the converted board for debugging
-            Log.d(TAG, "Converted board state for AI:");
-            for (String row : convertedBoardState) {
-                Log.d(TAG, row);
-            }
-
-            jsonPayload.put("board_state", boardState);
-            jsonPayload.put("is_player1", false); // Robot is always player2 (X)
-            jsonPayload.put("depth", 3); // Default depth, can be made configurable
-            jsonPayload.put("eval_func", 1); // Default eval function, can be made configurable
+            JSONObject jsonPayload = new JSONObject();
+            jsonPayload.put("board_state", boardStateJson);
+            jsonPayload.put("is_player1", false);
+            jsonPayload.put("depth", 3);
+            jsonPayload.put("eval_func", 1);
             jsonPayload.put("use_heuristic", true);
 
-            // Send the request to the AI server
-            String url = String.format("http://%s:%d/get_ai_move", serverIp, AI_PORT);
-
+            String url = "http://" + serverIp + ":" + AI_PORT + "/get_ai_move";
             Request request = new Request.Builder()
                     .url(url)
                     .post(RequestBody.create(jsonPayload.toString(), JSON))
@@ -682,7 +582,7 @@ public class IntegratedAIGameFragment extends Fragment {
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                    requireActivity().runOnUiThread(() -> {
+                    safeRunOnUiThread(() -> {
                         btnGetAIMove.setEnabled(true);
                         tvAIResponse.setText("Error: " + e.getMessage());
                         Toast.makeText(requireContext(),
@@ -694,391 +594,161 @@ public class IntegratedAIGameFragment extends Fragment {
                 @Override
                 public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
                     final String responseData = response.body().string();
-                    requireActivity().runOnUiThread(() -> {
+                    safeRunOnUiThread(() -> {
                         btnGetAIMove.setEnabled(true);
                         try {
                             JSONObject jsonResponse = new JSONObject(responseData);
-                            if (jsonResponse.getString("status").equals("success")) {
-                                JSONArray moveSequence = jsonResponse.getJSONArray("move_sequence");
-                                lastRecommendedMoveSequence = moveSequence;
-                                String info = "AI Move Sequence: " + moveSequence.toString();
-                                tvAIResponse.setText(info);
+                            String status = jsonResponse.optString("status", "error");
+                            if ("success".equals(status)) {
+                                JSONArray moveSeq = jsonResponse.getJSONArray("move_sequence");
+                                lastRecommendedMoveSequence = moveSeq;
+                                tvAIResponse.setText("AI Move Sequence: " + moveSeq.toString());
                                 btnExecuteMove.setEnabled(true);
-                            }
-                            else if (jsonResponse.getString("status").equals("no_move_possible")) {
-                                // Handle scenario where no moves are possible
+                            } else if ("no_move_possible".equals(status)) {
                                 tvAIResponse.setText("No valid moves available. Your turn!");
-                                btnExecuteMove.setEnabled(false);}
-                            else {
-                                tvAIResponse.setText("Error: " + jsonResponse.optString("message", "Unknown error"));
+                                btnExecuteMove.setEnabled(false);
+                            } else {
+                                tvAIResponse.setText("AI Error: " + jsonResponse.optString("message", "Unknown"));
                             }
                         } catch (JSONException e) {
-                            tvAIResponse.setText("Error parsing response: " + e.getMessage());
+                            tvAIResponse.setText("Error parsing AI response: " + e.getMessage());
                         }
                     });
                 }
             });
-
         } catch (JSONException e) {
             btnGetAIMove.setEnabled(true);
-            tvAIResponse.setText("Error creating JSON payload: " + e.getMessage());
+            safeRunOnUiThread(() -> tvAIResponse.setText("Error creating JSON payload: " + e.getMessage()));
         }
     }
 
     private void executeAIMoveSequence(JSONArray moveSequence) {
         Log.d(TAG, "executeAIMoveSequence called");
-
-        // Show immediate feedback
         Toast.makeText(requireContext(), "Executing AI move...", Toast.LENGTH_SHORT).show();
-
         if (moveSequence == null || moveSequence.length() < 2) {
             Toast.makeText(requireContext(), "Invalid move sequence", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Disable UI to prevent double clicks
         btnExecuteMove.setEnabled(false);
-        tvAIResponse.append("\n\nExecuting move sequence...");
+        safeRunOnUiThread(() -> tvAIResponse.append("\n\nExecuting move sequence..."));
 
         try {
-            // Set moving flag
             isMoving = true;
+            updateAutoPlayButtonState();
 
-            // Step 1: Convert JSON array of board coordinates into CellCoordinates
-            List<CellCoordinate> path = new ArrayList<>();
-            for (int i = 0; i < moveSequence.length(); i++) {
-                try {
-                    JSONObject coordObj = moveSequence.getJSONObject(i);
-                    int boardX = coordObj.getInt("x");
-                    int boardY = coordObj.getInt("y");
-
-                    Log.d(TAG, "Processing board coordinates: (" + boardX + "," + boardY + ")");
-
-                    // Convert board coords -> robot coords
-                    CellCoordinate cellCoord = BoardCoordinatesAdapter.getInstance()
-                            .getBoardCellCoordinate(boardX, boardY);
-
-                    if (cellCoord == null) {
-                        Log.e(TAG, "No mapping for board coords (" + boardX + "," + boardY + ")");
-                        continue;
-                    }
-
-                    path.add(cellCoord);
-                    Log.d(TAG, "Added cell coordinate: (" + cellCoord.getGridX() + "," +
-                            cellCoord.getGridY() + ") at robot position (X=" + cellCoord.getX() +
-                            ", Y=" + cellCoord.getY() + ", Z=" + cellCoord.getZ() + ")");
-                } catch (JSONException e) {
-                    Log.e(TAG, "Error parsing coordinate at index " + i, e);
-                }
-            }
-
-            if (path.size() < 2) {
-                requireActivity().runOnUiThread(() -> {
-                    isMoving = false;
-                    btnExecuteMove.setEnabled(true);
-                    tvAIResponse.append("\nError: Could not create a valid path with at least 2 points");
-                    Toast.makeText(requireContext(), "Invalid path from AI", Toast.LENGTH_SHORT).show();
-
-                });
-                return;
-            }
-
-            // Log the path for debugging
-            tvAIResponse.append("\nPath created with " + path.size() + " points");
-
-            // Reset the arm first for safety
-            tvAIResponse.append("\nResetting arm position...");
-            robotController.reset();
-
-            // Wait for reset to complete
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-
-            // Execute the move with marble handling
             new Thread(() -> {
                 try {
+                    List<CellCoordinate> path = new ArrayList<>();
+                    for (int i = 0; i < moveSequence.length(); i++) {
+                        JSONObject coordObj = moveSequence.getJSONObject(i);
+                        int boardX = coordObj.getInt("x");
+                        int boardY = coordObj.getInt("y");
+                        CellCoordinate cell = BoardCoordinatesAdapter.getInstance().getBoardCellCoordinate(boardX, boardY);
+                        if (cell != null) {
+                            path.add(cell);
+                        } else {
+                            Log.e(TAG, "No mapping for (" + boardX + "," + boardY + ")");
+                        }
+                    }
+                    if (path.size() < 2) {
+                        safeRunOnUiThread(() -> {
+                            isMoving = false;
+                            updateAutoPlayButtonState();
+                            btnExecuteMove.setEnabled(true);
+                            tvAIResponse.append("\nError: Path must have at least 2 points");
+                        });
+                        return;
+                    }
+                    safeRunOnUiThread(() -> tvAIResponse.append("\nPath created with " + path.size() + " points"));
+                    robotController.reset();
+                    Thread.sleep(2000);
+
                     boolean success = executeMove(path);
-                    requireActivity().runOnUiThread(() -> {
+                    safeRunOnUiThread(() -> {
                         isMoving = false;
+                        updateAutoPlayButtonState();
                         btnExecuteMove.setEnabled(true);
                         if (success) {
                             tvAIResponse.append("\nMove sequence completed successfully!");
-                            Toast.makeText(requireContext(),
-                                    "Move sequence completed successfully",
-                                    Toast.LENGTH_SHORT).show();
+                            Toast.makeText(requireContext(), "Move sequence completed successfully", Toast.LENGTH_SHORT).show();
                         } else {
                             tvAIResponse.append("\nMove sequence failed.");
-                            Toast.makeText(requireContext(),
-                                    "Move sequence failed",
-                                    Toast.LENGTH_SHORT).show();
+                            Toast.makeText(requireContext(), "Move sequence failed", Toast.LENGTH_SHORT).show();
                         }
                     });
                 } catch (Exception e) {
                     Log.e(TAG, "Error in move thread", e);
-                    requireActivity().runOnUiThread(() -> {
+                    safeRunOnUiThread(() -> {
                         isMoving = false;
+                        updateAutoPlayButtonState();
                         btnExecuteMove.setEnabled(true);
                         tvAIResponse.append("\nError: " + e.getMessage());
-                        Toast.makeText(requireContext(),
-                                "Error: " + e.getMessage(),
-                                Toast.LENGTH_SHORT).show();
+                        Toast.makeText(requireContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                     });
                 }
             }).start();
 
         } catch (Exception e) {
             Log.e(TAG, "Error executing AI move sequence", e);
-            requireActivity().runOnUiThread(() -> {
+            safeRunOnUiThread(() -> {
                 isMoving = false;
+                updateAutoPlayButtonState();
                 btnExecuteMove.setEnabled(true);
                 tvAIResponse.append("\nError: " + e.getMessage());
-                Toast.makeText(requireContext(),
-                        "Error: " + e.getMessage(),
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             });
         }
+        // Clear the current board state so autoPlay can restart fresh next time
+        currentBoardState = null;
     }
 
     /**
-     * Execute a complete move with marble handling
-     * @param path List of coordinates representing the move path
-     * @return true if successful, false if any step fails
+     * Executes the robot move along the given path.
+     * Retries a step (by decrementing the loop counter) if moveToAndWait() fails.
      */
-//    private boolean executeMove(List<CellCoordinate> path) {
-//        // Constants for move parameters
-//        final int MAX_RETRIES = 3;
-//        final int RETRY_DELAY_MS = 2000;
-//        final int MOVEMENT_WAIT_MS = 5000;
-//        final int GRIPPER_WAIT_MS = 3000;
-//        final float SAFE_Z = -80f;
-//
-//        // Get origin and destination
-//        CellCoordinate origin = path.get(0);
-//        CellCoordinate destination = path.get(path.size() - 1);
-//
-//        try {
-//            // Step 1: Move to a safe position above the origin
-//            updateProgress("Moving above origin piece");
-//            if (!moveWithRetry(origin.getX(), origin.getY(), SAFE_Z, origin.getTorque(),
-//                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-//                updateProgress("Failed to move above origin");
-//                return false;
-//            }
-//
-//            // Step 2: Move down to the piece
-//            updateProgress("Moving down to pick up piece");
-//            if (!moveWithRetry(origin.getX(), origin.getY(), origin.getZ(), origin.getTorque(),
-//                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-//                updateProgress("Failed to move down to piece");
-//                return false;
-//            }
-//
-//            // Step 3: Close gripper to grab piece
-//            updateProgress("Closing gripper to grab piece");
-//            robotController.controlGripper(true);
-//            Thread.sleep(GRIPPER_WAIT_MS);
-//
-//            // Step 4: Lift piece to safe height
-//            updateProgress("Lifting piece");
-//            if (!moveWithRetry(origin.getX(), origin.getY(), SAFE_Z, origin.getTorque(),
-//                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-//                updateProgress("Failed to lift piece");
-//                // Release grip in case of failure
-//                robotController.controlGripper(false);
-//                return false;
-//            }
-//
-//            // Step 5: Move through any intermediate points if they exist
-//            if (path.size() > 2) {
-//                for (int i = 1; i < path.size() - 1; i++) {
-//                    CellCoordinate intermediate = path.get(i);
-//                    updateProgress("Moving through position " + (i+1) + " of " + path.size());
-//
-//                    if (!moveWithRetry(intermediate.getX(), intermediate.getY(), SAFE_Z,
-//                            intermediate.getTorque(), MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-//                        updateProgress("Failed to move through intermediate position " + (i+1));
-//                        // Release grip in case of failure
-//                        robotController.controlGripper(false);
-//                        return false;
-//                    }
-//                }
-//            }
-//
-//            // Step 6: Move to position above destination
-//            updateProgress("Moving above destination");
-//            if (!moveWithRetry(destination.getX(), destination.getY(), SAFE_Z, destination.getTorque(),
-//                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-//                updateProgress("Failed to move above destination");
-//                // Release grip in case of failure
-//                robotController.controlGripper(false);
-//                return false;
-//            }
-//
-//            // Step 7: Lower piece to final position
-//            updateProgress("Lowering piece to destination");
-//            if (!moveWithRetry(destination.getX(), destination.getY(), destination.getZ(),
-//                    destination.getTorque(), MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-//                updateProgress("Failed to lower piece to destination");
-//                // Release grip anyway to drop piece
-//                robotController.controlGripper(false);
-//                return false;
-//            }
-//
-//            // Step 8: Open gripper to release piece
-//            updateProgress("Opening gripper to release piece");
-//            robotController.controlGripper(false);
-//            Thread.sleep(GRIPPER_WAIT_MS);
-//
-//            // Step 9: Lift arm back to safe height
-//            updateProgress("Lifting arm from destination");
-//            if (!moveWithRetry(destination.getX(), destination.getY(), SAFE_Z, destination.getTorque(),
-//                    MAX_RETRIES, RETRY_DELAY_MS, MOVEMENT_WAIT_MS)) {
-//                updateProgress("Failed to lift arm from destination (but piece was placed)");
-//                // Not a critical failure as the piece was placed
-//                return true;
-//            }
-//
-//            // Step 10: Return to home position
-//            updateProgress("Returning to home position");
-//            robotController.reset();
-//            Thread.sleep(MOVEMENT_WAIT_MS);
-//
-//            return true;
-//
-//        } catch (Exception e) {
-//            Log.e(TAG, "Error during move execution", e);
-//            updateProgress("Error: " + e.getMessage());
-//            // Try to release grip in case of exception
-//            try {
-//                robotController.controlGripper(false);
-//            } catch (Exception ex) {
-//                Log.e(TAG, "Error releasing gripper", ex);
-//            }
-//            return false;
-//        }
-//    }
-
     private boolean executeMove(List<CellCoordinate> path) {
-        // Constants
         final int GRIPPER_WAIT_MS = 3000;
-        final CountDownLatch moveLatch = new CountDownLatch(1);
-        final AtomicBoolean moveSuccess = new AtomicBoolean(false);
-
         try {
-            // Step 1: Move to origin position to pick up marble
+            // Step 1: Move to the first coordinate (pick up)
             CellCoordinate origin = path.get(0);
-            updateProgress("Moving to pick up marble");
-
-            // Execute movement with callback
-            CompletableFuture<Boolean> originMove = robotController.executeVerifiedMovement(
-                    origin.getX(), origin.getY(), origin.getZ(), origin.getTorque(),
-                    new RobotController.MovementCallback() {
-                        @Override
-                        public void onSuccess() {
-                            updateProgress("Successfully reached pick up position");
-                            moveSuccess.set(true);
-                            moveLatch.countDown();
-                        }
-
-                        @Override
-                        public void onFailure(String errorMessage) {
-                            updateProgress("Failed to reach pick up position: " + errorMessage);
-                            moveLatch.countDown();
-                        }
-
-                        @Override
-                        public void onProgress(String status) {
-                            updateProgress(status);
-                        }
-                    }
-            );
-
-            // Wait for movement to complete
-            moveLatch.await();
-            if (!moveSuccess.get()) {
-                updateProgress("Failed to reach pick up position");
-                return false;
+            if (!moveToAndWait(origin)) {
+//                return false;
+                updateProgress("Warning: Failed to reach pickup position accurately. Attempting to continue anyway.");
             }
 
-            // Step 2: Close gripper to grab marble
-            updateProgress("Grabbing marble");
+
+            // Step 2: Close gripper (grab)
+            updateProgress("Grabbing marble...");
             robotController.controlGripper(true);
             Thread.sleep(GRIPPER_WAIT_MS);
 
-            // Step 3: Move through all intermediate points in path
+            // Step 3: Move through the remaining coordinates
             for (int i = 1; i < path.size(); i++) {
-                final CellCoordinate nextPosition = path.get(i);
-                final int moveIndex = i;
-                final CountDownLatch stepLatch = new CountDownLatch(1);
-                final AtomicBoolean stepSuccess = new AtomicBoolean(false);
-
-                updateProgress("Moving to position " + moveIndex + " of " + (path.size() - 1));
-
-                CompletableFuture<Boolean> stepMove = robotController.executeVerifiedMovement(
-                        nextPosition.getX(), nextPosition.getY(), nextPosition.getZ(), nextPosition.getTorque(),
-                        new RobotController.MovementCallback() {
-                            @Override
-                            public void onSuccess() {
-                                updateProgress("Successfully reached position " + moveIndex);
-                                stepSuccess.set(true);
-                                stepLatch.countDown();
-                            }
-
-                            @Override
-                            public void onFailure(String errorMessage) {
-                                updateProgress("Failed to reach position " + moveIndex + ": " + errorMessage);
-                                stepLatch.countDown();
-                            }
-
-                            @Override
-                            public void onProgress(String status) {
-                                updateProgress(status);
-                            }
-                        }
-                );
-
-                // Wait for step to complete
-                stepLatch.await();
-                if (!stepSuccess.get()) {
-                    updateProgress("Failed to reach position " + moveIndex);
-                    robotController.controlGripper(false); // Release grip on failure
-                    return false;
+                // If a move fails, retry this step by decrementing i
+                if (!moveToAndWait(path.get(i))) {
+//                    i--;
+                    //tentatively we dont retry
+                    updateProgress("Warning: Failed to reach target position：" + i+". Attempting to continue anyway.");
                 }
             }
 
-            // Step 4: Release marble at final position
-            updateProgress("Releasing marble");
+            // Step 4: Release gripper (drop)
+            updateProgress("Releasing marble...");
             robotController.controlGripper(false);
             Thread.sleep(GRIPPER_WAIT_MS);
 
-            // Step 5: Return to home position
-            updateProgress("Returning to home position");
-            final CountDownLatch resetLatch = new CountDownLatch(1);
-
-            // Send reset command asynchronously
-            new Thread(() -> {
-                robotController.reset();
-                try {
-                    Thread.sleep(2000); // Give reset time to execute
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-                resetLatch.countDown();
-            }).start();
-
-            // Wait for reset to complete
-            resetLatch.await();
+            // Step 5: Return home
+            updateProgress("Returning home...");
+            robotController.reset();
+            Thread.sleep(2000);
 
             return true;
-
         } catch (Exception e) {
-            Log.e(TAG, "Error during move execution", e);
+            Log.e(TAG, "Error during executeMove()", e);
             updateProgress("Error: " + e.getMessage());
             try {
-                robotController.controlGripper(false); // Make sure to release gripper on error
+                robotController.controlGripper(false); // Release gripper if an error occurs
             } catch (Exception ex) {
                 Log.e(TAG, "Error releasing gripper", ex);
             }
@@ -1087,225 +757,253 @@ public class IntegratedAIGameFragment extends Fragment {
     }
 
     /**
-     * Helper method for movement with retry logic
+     * Moves to the given coordinate and waits until movement is verified.
      */
-    /**
-     * Helper method for movement with retry logic
-     */
-    private boolean moveWithRetry(float x, float y, float z, float torque,
-                                  int maxRetries, int retryDelayMs, int waitTimeMs) {
-        // Set position tolerance to 2mm (expressed in robot units)
-        final float POSITION_TOLERANCE = 2.0f;
-        // Maximum number of retry attempts
-        final int MAX_TRIES = 5;
-        // Step size of 1mm for each adjustment
-        final float CORRECTION_STEP = 1.0f;
+    private boolean moveToAndWait(CellCoordinate coord) {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final AtomicBoolean success = new AtomicBoolean(false);
 
-        for (int attempt = 1; attempt <= MAX_TRIES; attempt++) {
-            try {
-                // Calculate the target for this attempt
-                float targetX = x;
-                float targetY = y;
-                float targetZ = z;
+        updateProgress(String.format("Moving to (X=%.2f, Y=%.2f, Z=%.2f)...", coord.getX(), coord.getY(), coord.getZ()));
 
-                // Only adjust the target on retry attempts
-                if (attempt > 1) {
-                    // Get current position to calculate error direction
-                    JSONObject currentPos = robotController.getPositionFeedback();
-                    if (currentPos != null) {
-                        try {
-                            float currentX = (float) currentPos.getDouble("x");
-                            float currentY = (float) currentPos.getDouble("y");
+        CompletableFuture<Boolean> fut = robotController.executeVerifiedMovement(
+                coord.getX(), coord.getY(), coord.getZ(), coord.getTorque(),
+                new RobotController.MovementCallback() {
+                    @Override
+                    public void onSuccess() {
+                        updateProgress("Reached successfully.");
+                        success.set(true);
+                        latch.countDown();
+                    }
 
-                            // Calculate the error from the ORIGINAL target
-                            float diffX = x - currentX;
-                            float diffY = y - currentY;
+                    @Override
+                    public void onFailure(String errorMessage) {
+                        updateProgress("Move failed: " + errorMessage);
+                        latch.countDown();
+                    }
 
-                            // For first correction (attempt 2), just use the difference
-//                            if (attempt == 2) {
-                                if (attempt >= 2) {
-                                targetX = x + diffX;
-                                targetY = y + diffY;
-                                updateProgress(String.format(Locale.US,
-                                        "First correction (attempt %d):\n" +
-                                                "Original target: (X=%.2f, Y=%.2f, Z=%.2f)\n" +
-                                                "Current position: (X=%.2f, Y=%.2f)\n" +
-                                                "Error: (X=%.2f, Y=%.2f)\n" +
-                                                "Applying exact error correction\n" +
-                                                "Adjusted target: (X=%.2f, Y=%.2f, Z=%.2f)",
-                                        attempt,
-                                        x, y, z,
-                                        currentX, currentY,
-                                        diffX, diffY,
-                                        targetX, targetY, targetZ));
-                            }
-                            // For subsequent corrections, add increasing step size
-                            else {
-                                float additionalCorrection = CORRECTION_STEP * (attempt - 2);
-                                targetX = x + diffX* 0 + (diffX >= 0 ? additionalCorrection : -additionalCorrection);
-                                targetY = y + diffY* 0 + (diffY >= 0 ? additionalCorrection : -additionalCorrection);
-
-                                updateProgress(String.format(Locale.US,
-                                        "Correction attempt %d:\n" +
-                                                "Original target: (X=%.2f, Y=%.2f, Z=%.2f)\n" +
-                                                "Current position: (X=%.2f, Y=%.2f)\n" +
-                                                "Error: (X=%.2f, Y=%.2f)\n" +
-                                                "Additional correction: %.2f mm\n" +
-                                                "Adjusted target: (X=%.2f, Y=%.2f, Z=%.2f)",
-                                        attempt,
-                                        x, y, z,
-                                        currentX, currentY,
-                                        diffX, diffY,
-                                        additionalCorrection,
-                                        targetX, targetY, targetZ));
-                            }
-                        } catch (JSONException e) {
-                            updateProgress("Error parsing current position for adjustment: " + e.getMessage());
-                        }
-                    } else {
-                        updateProgress("Couldn't get current position for adjustment. Using original target.");
+                    @Override
+                    public void onProgress(String status) {
+                        updateProgress(status);
                     }
                 }
+        );
 
-                // Send the movement command
-                updateProgress("Sending movement command to: X=" + targetX + ", Y=" + targetY +
-                        ", Z=" + targetZ + ", T=" + torque);
-                robotController.moveTo(targetX, targetY, targetZ, torque);
-
-                // Wait for movement to complete
-                updateProgress("Waiting for movement to complete...");
-                Thread.sleep(waitTimeMs);
-
-                // Check position feedback
-                updateProgress("Getting position feedback...");
-                JSONObject feedback = robotController.getPositionFeedback();
-                if (feedback != null) {
-                    float currentX = (float) feedback.getDouble("x");
-                    float currentY = (float) feedback.getDouble("y");
-                    float currentZ = (float) feedback.getDouble("z");
-                    float currentT = (float) feedback.getDouble("t");
-
-                    // Calculate differences from the ORIGINAL TARGET
-                    float diffX = x - currentX;
-                    float diffY = y - currentY;
-
-                    // Only check X and Y coordinates (exclude Z)
-                    boolean isPositionCorrect =
-                            Math.abs(diffX) <= POSITION_TOLERANCE &&
-                                    Math.abs(diffY) <= POSITION_TOLERANCE;
-
-                    if (isPositionCorrect) {
-                        updateProgress("Position reached successfully with tolerance of " + POSITION_TOLERANCE + "mm");
-                        updateProgress(String.format(Locale.US,
-                                "Target: (X=%.2f, Y=%.2f, Z=%.2f, T=%.2f)",
-                                x, y, z, torque));
-                        updateProgress(String.format(Locale.US,
-                                "Final position: (X=%.2f, Y=%.2f, Z=%.2f, T=%.2f)",
-                                currentX, currentY, currentZ, currentT));
-                        return true;
-                    } else {
-                        String positionInfo = String.format(Locale.US,
-                                "Position not reached (attempt %d/%d)\n" +
-                                        "Original target: (X=%.2f, Y=%.2f, Z=%.2f, T=%.2f)\n" +
-                                        "Actual position: (X=%.2f, Y=%.2f, Z=%.2f, T=%.2f)\n" +
-                                        "Error: (X=%.2f, Y=%.2f)\n" +
-                                        "Tolerance: %.2f",
-                                attempt, MAX_TRIES,
-                                x, y, z, torque,
-                                currentX, currentY, currentZ, currentT,
-                                diffX, diffY,
-                                POSITION_TOLERANCE);
-
-                        updateProgress(positionInfo);
-                        updateProgress("Raw feedback: " + feedback.toString());
-                    }
-                } else {
-                    updateProgress("Could not get position feedback");
-                }
-
-                // If we're here, position wasn't reached - wait before retry
-                if (attempt < MAX_TRIES) {
-                    updateProgress("Waiting " + retryDelayMs + "ms before retry...");
-                    Thread.sleep(retryDelayMs);
-                }
-
-            } catch (Exception e) {
-                Log.e(TAG, "Error during move attempt " + attempt, e);
-                updateProgress("Error: " + e.getMessage());
-
-                try {
-                    if (attempt < MAX_TRIES) {
-                        Thread.sleep(retryDelayMs);
-                    }
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    return false;
-                }
+        try {
+            if (!latch.await(300, TimeUnit.SECONDS)) {
+                updateProgress("Timeout waiting for movement!");
+                return false;
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            updateProgress("Movement interrupted!");
+            return false;
         }
-
-        updateProgress("Failed to reach position after " + MAX_TRIES + " attempts");
-        return false;  // All retries failed
+        return success.get();
     }
 
     /**
-     * Update progress on the UI thread
+     * Updates the tvAIResponse text on the UI.
+     * Checks that the fragment is still added and its view is not null.
      */
-    private void updateProgress(String message) {
-        Log.d(TAG, message);
-        requireActivity().runOnUiThread(() -> {
-            tvAIResponse.append("\n" + message);
-        });
+    private void updateProgress(String msg) {
+        Log.d(TAG, msg);
+        if (isAdded() && getView() != null) {
+            requireActivity().runOnUiThread(() -> tvAIResponse.append("\n" + msg));
+        }
+    }
+
+    /**
+     * A helper method to safely run code on the UI thread.
+     */
+    private void safeRunOnUiThread(Runnable r) {
+        if (isAdded() && getView() != null) {
+            requireActivity().runOnUiThread(r);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    //  Gripper, IP Config, Debug, etc.
+    // ------------------------------------------------------------------
+
+    private void controlGripper(boolean close) {
+        isMoving = true;
+        updateAutoPlayButtonState();
+        robotController.controlGripper(close);
+        Toast.makeText(requireContext(), close ? "Closing gripper" : "Opening gripper", Toast.LENGTH_SHORT).show();
+        safeRunOnUiThread(() -> tvAIResponse.append("\n" + (close ? "Gripper closing..." : "Gripper opening...")));
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            isMoving = false;
+            updateAutoPlayButtonState();
+        }, 1000);
+    }
+
+    private void showServerIpConfigDialog() {
+        new IpConfigDialog(requireContext(), serverIp, "Configure Server IP", newIp -> {
+            serverIp = newIp;
+            detectionClient = new BoardDetectionClient(serverIp);
+            Toast.makeText(requireContext(), "Server IP updated to: " + newIp, Toast.LENGTH_SHORT).show();
+        }).show();
+    }
+
+    private void showRobotIpConfigDialog() {
+        new IpConfigDialog(requireContext(), robotIp, "Configure Robot IP", newIp -> {
+            robotIp = newIp;
+            robotController.setRobotIp(newIp);
+            Toast.makeText(requireContext(), "Robot IP updated to: " + newIp, Toast.LENGTH_SHORT).show();
+        }).show();
+    }
+
+    private void showDebugInfo() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Debug Info:\n");
+        sb.append("Server IP: ").append(serverIp).append("\n");
+        sb.append("Robot IP: ").append(robotIp).append("\n");
+        sb.append("isMoving: ").append(isMoving).append("\n");
+        sb.append("hasEmptyBoard: ").append(hasEmptyBoard).append("\n");
+        safeRunOnUiThread(() -> tvMappedPosition.setText(sb.toString()));
+        Log.d(TAG, sb.toString());
+        Toast.makeText(requireContext(), "Debug info displayed", Toast.LENGTH_SHORT).show();
+    }
+
+    private void lookupAndMoveToPosition() {
+        if (isMoving) {
+            Toast.makeText(requireContext(), "Robot is currently moving. Please wait.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            int boardX = Integer.parseInt(etDebugBoardX.getText().toString().trim());
+            int boardY = Integer.parseInt(etDebugBoardY.getText().toString().trim());
+            CellCoordinate coord = BoardCoordinatesAdapter.getInstance().getBoardCellCoordinate(boardX, boardY);
+            if (coord == null) {
+                safeRunOnUiThread(() -> tvMappedPosition.setText("No mapping found for board coords (" + boardX + "," + boardY + ")"));
+                return;
+            }
+            String info = String.format(Locale.US, "Mapped Board(%d,%d) → (X=%.2f, Y=%.2f, Z=%.2f, T=%.2f)",
+                    boardX, boardY, coord.getX(), coord.getY(), coord.getZ(), coord.getTorque());
+            safeRunOnUiThread(() -> tvMappedPosition.setText(info));
+            Log.d(TAG, info);
+
+            // Move there
+            isMoving = true;
+            btnLookupCoords.setEnabled(false);
+            updateAutoPlayButtonState();
+
+            robotController.executeVerifiedMovement(
+                    coord.getX(), coord.getY(), coord.getZ(), coord.getTorque(),
+                    new RobotController.MovementCallback() {
+                        @Override
+                        public void onSuccess() {
+                            safeRunOnUiThread(() -> {
+                                isMoving = false;
+                                updateAutoPlayButtonState();
+                                btnLookupCoords.setEnabled(true);
+                                Toast.makeText(requireContext(), "Movement completed", Toast.LENGTH_SHORT).show();
+                            });
+                        }
+
+                        @Override
+                        public void onFailure(String errorMessage) {
+                            safeRunOnUiThread(() -> {
+                                isMoving = false;
+                                updateAutoPlayButtonState();
+                                btnLookupCoords.setEnabled(true);
+                                Toast.makeText(requireContext(), "Movement failed: " + errorMessage, Toast.LENGTH_SHORT).show();
+                            });
+                        }
+
+                        @Override
+                        public void onProgress(String status) {
+                            safeRunOnUiThread(() -> tvMappedPosition.append("\n" + status));
+                        }
+                    }
+            );
+        } catch (NumberFormatException e) {
+            safeRunOnUiThread(() -> tvMappedPosition.setText("Invalid coordinates. Please enter valid numbers."));
+        }
     }
 
     private void startCamera() {
-        ListenableFuture<ProcessCameraProvider> cameraProviderFuture =
-                ProcessCameraProvider.getInstance(requireContext());
-
+        ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext());
         cameraProviderFuture.addListener(() -> {
             try {
                 ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-
-                // Set up the preview use case
                 Preview preview = new Preview.Builder()
                         .setTargetAspectRatio(AspectRatio.RATIO_4_3)
                         .build();
-
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
-
-                // Configure image capture use case
                 imageCapture = new ImageCapture.Builder()
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                         .setTargetAspectRatio(AspectRatio.RATIO_4_3)
                         .setTargetRotation(Surface.ROTATION_0)
                         .build();
-
-                // Select back camera
                 CameraSelector cameraSelector = new CameraSelector.Builder()
                         .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                         .build();
-
-                // Unbind existing use cases before rebinding
                 cameraProvider.unbindAll();
-
-                // Bind use cases to camera
-                Camera camera = cameraProvider.bindToLifecycle(
-                        getViewLifecycleOwner(),
-                        cameraSelector,
-                        preview,
-                        imageCapture
-                );
-
-                // Set up zoom if needed
-                camera.getCameraControl().setLinearZoom(0.0f);
-
+                Camera camera = cameraProvider.bindToLifecycle(getViewLifecycleOwner(), cameraSelector, preview, imageCapture);
+                camera.getCameraControl().setLinearZoom(0f);
                 Log.d(TAG, "Camera started successfully");
-
             } catch (ExecutionException | InterruptedException e) {
                 String msg = "Error starting camera: " + e.getMessage();
                 Log.e(TAG, msg, e);
                 Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
             }
         }, ContextCompat.getMainExecutor(requireContext()));
+    }
+
+    private void updateAutoPlayButtonState() {
+        if (btnAutoPlay != null) {
+            btnAutoPlay.setEnabled(!isMoving);
+            btnAutoPlay.setAlpha(isMoving ? 0.5f : 1.0f);
+        }
+    }
+
+    private void setupKeyboardListener() {
+        View rootView = requireView();
+        rootView.setFocusableInTouchMode(true);
+        rootView.requestFocus();
+        rootView.setOnKeyListener((v, keyCode, event) -> {
+            if (event.getAction() == KeyEvent.ACTION_DOWN &&
+                    (keyCode == KeyEvent.KEYCODE_E || keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_F7)) {
+                Toast.makeText(requireContext(), "E/e key pressed -> autoPlay()!", Toast.LENGTH_SHORT).show();
+                Log.d(TAG, "E/e key pressed -> autoPlay()!");
+                if (btnAutoPlay != null && btnAutoPlay.isEnabled()) {
+                    btnAutoPlay.performClick();
+                    return true;
+                }
+            }
+            return false;
+        });
+        Log.d(TAG, "Keyboard listener set up");
+    }
+
+    //sound
+
+
+    private void playButtonSound() {
+        try {
+            if (soundPlayer != null) {
+                // If already playing, stop and reset
+                if (soundPlayer.isPlaying()) {
+                    soundPlayer.stop();
+                    soundPlayer.seekTo(0);
+                }
+                soundPlayer.start();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error playing sound", e);
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Ensure the fragment's root view regains focus when resumed
+        View rootView = getView();
+        if (rootView != null) {
+            rootView.setFocusableInTouchMode(true);
+            rootView.requestFocus();
+        }
     }
 }

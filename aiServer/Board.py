@@ -311,56 +311,72 @@ class Board():
         return next(tile for tile in self.board_tiles if tile.get_piece() is piece)
     
         # --- In Board.py ---
-    def get_all_jump_paths(self, start_tile: Tile):
-            """
-            Returns a list of possible multi-jump paths for the piece in start_tile.
-            Each path is a list of Tiles: [start_tile, ..., final_tile].
-            If no jumps are possible, it returns an empty list.
-            """
-            if start_tile.is_empty():
-                return []  # No piece here -> no paths
+    # def get_all_jump_paths(self, start_tile: Tile):
+    #         """
+    #         Returns a list of possible multi-jump paths for the piece in start_tile.
+    #         Each path is a list of Tiles: [start_tile, ..., final_tile].
+    #         If no jumps are possible, it returns an empty list.
+    #         """
+    #         if start_tile.is_empty():
+    #             return []  # No piece here -> no paths
 
-            all_paths = []
+    #         all_paths = []
 
-            def backtrack(current_path, visited):
-                current_tile = current_path[-1]
+    #         def backtrack(current_path, visited):
+    #             current_tile = current_path[-1]
 
-                # We'll track if we found any new jump from this tile
-                found_jump = False
+    #             # We'll track if we found any new jump from this tile
+    #             found_jump = False
 
-                for direction, neighbor in current_tile.get_neighbours().items():
-                    # Must have a piece to jump over
-                    if not neighbor.is_empty():
-                        # The tile after neighbor in the same direction
-                        jump_tile = neighbor.get_neighbours().get(direction, None)
-                        if jump_tile and jump_tile.is_empty() and jump_tile not in visited:
-                            # Valid jump
-                            found_jump = True
-                            current_path.append(jump_tile)
-                            visited.add(jump_tile)
+    #             for direction, neighbor in current_tile.get_neighbours().items():
+    #                 # Must have a piece to jump over
+    #                 if not neighbor.is_empty():
+    #                     # The tile after neighbor in the same direction
+    #                     jump_tile = neighbor.get_neighbours().get(direction, None)
+    #                     if jump_tile and jump_tile.is_empty() and jump_tile not in visited:
+    #                         # Valid jump
+    #                         found_jump = True
+    #                         current_path.append(jump_tile)
+    #                         visited.add(jump_tile)
 
-                            backtrack(current_path, visited)
+    #                         backtrack(current_path, visited)
 
-                            # Undo
-                            current_path.pop()
-                            visited.remove(jump_tile)
+    #                         # Undo
+    #                         current_path.pop()
+    #                         visited.remove(jump_tile)
 
-                # If we never found a jump from current_tile, it means
-                # this path can't extend further. Save the path as-is.
-                if not found_jump:
-                    # We want to store a copy of the current path
-                    all_paths.append(list(current_path))
+    #             # If we never found a jump from current_tile, it means
+    #             # this path can't extend further. Save the path as-is.
+    #             if not found_jump:
+    #                 # We want to store a copy of the current path
+    #                 all_paths.append(list(current_path))
 
-            # Start backtracking from the start tile
-            visited = set([start_tile])
-            backtrack([start_tile], visited)
+    #         # Start backtracking from the start tile
+    #         visited = set([start_tile])
+    #         backtrack([start_tile], visited)
 
-            # Now all_paths might include 1-length “paths” if no jump is possible.
-            # For multi-jump moves, we only want those with length > 1 to indicate
-            # an actual jump. But if you also want to allow single-step adjacency (non-jumps)
-            # in the same turn, handle that separately. Typically, we expect jumps to be length>=2.
+    #         # Now all_paths might include 1-length “paths” if no jump is possible.
+    #         # For multi-jump moves, we only want those with length > 1 to indicate
+    #         # an actual jump. But if you also want to allow single-step adjacency (non-jumps)
+    #         # in the same turn, handle that separately. Typically, we expect jumps to be length>=2.
 
-            return all_paths
+    #         return all_paths
+    
+    def get_all_jump_paths(self, tile: Tile) -> list[list[Tile]]:
+        results = []
+        
+        def dfs(current_tile, current_path, visited):
+            found_jump = False
+            for next_tile in self.get_jump_destinations(current_tile):
+                if next_tile not in visited and self.is_valid_jump(current_tile, next_tile):
+                    found_jump = True
+                    new_path = current_path + [next_tile]
+                    dfs(next_tile, new_path, visited | {next_tile})
+            if not found_jump and len(current_path) > 1:
+                results.append(current_path)
+        
+        dfs(tile, [tile], {tile})
+        return results
 
     def apply_path(self, path: list[Tile]):
         """
@@ -387,5 +403,27 @@ class Board():
             prev_tile = path[i - 1]
             prev_tile.set_piece(moving_piece)
             cur_tile.set_empty()
+            
+            
+    def get_jump_destinations(self, tile: Tile) -> list[Tile]:
+        """
+        Returns a list of landing tiles reachable via a jump from the given tile.
+        A jump is allowed if there is an adjacent neighbor (in any valid direction)
+        that is occupied and the tile immediately beyond it (in the same direction) is empty.
+        """
+        destinations = []
+        for direction, neighbor in tile.get_neighbours().items():
+            if neighbor is not None and not neighbor.is_empty():
+                landing_tile = neighbor.get_neighbours().get(direction, None)
+                if landing_tile is not None and landing_tile.is_empty():
+                    destinations.append(landing_tile)
+        return destinations
+
+    def is_valid_jump(self, current_tile: Tile, landing_tile: Tile) -> bool:
+        """
+        Validates a jump move by ensuring that the landing_tile is reachable from
+        current_tile by jumping over an adjacent occupied tile.
+        """
+        return landing_tile in self.get_jump_destinations(current_tile)
 
 
