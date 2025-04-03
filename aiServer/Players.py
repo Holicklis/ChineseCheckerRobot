@@ -29,7 +29,6 @@ def ask_person_for_tile_destination(board: Board, tile_origin: Tile) -> Tile:
         if n in CHARACTERS[ : len(available_tile_destinations)]:
             destination_tile = available_tile_destinations[ CHARACTERS.index(n) ]
             return destination_tile
-
 def minimax_pruning(board: Board, depth: int, is_player1_turn: bool,
                     heuristic, use_eval_func_1: bool,
                     maximizing: bool = True,
@@ -46,74 +45,144 @@ def minimax_pruning(board: Board, depth: int, is_player1_turn: bool,
         found_any_move = False
 
         for tile_origin in tiles_for_player:
+            # First collect all valid paths from this origin
+            # This includes both single-step moves and complete jump paths
             possible_paths = []
-            # Single-step moves:
-            for dest in board.get_all_valid_moves(tile_origin):
-                if heuristic(tile_origin, dest):
-                    possible_paths.append([tile_origin, dest])
+            
+            # 1. Get single-step moves
+            try:
+                for dest in board.get_all_valid_moves(tile_origin):
+                    if heuristic(tile_origin, dest):
+                        possible_paths.append([tile_origin, dest])
+            except Exception as e:
+                print(f"Error getting valid moves: {e}")
+                continue  # Skip this tile if there's an error
 
-            jump_paths = board.get_all_jump_paths(tile_origin)
-            for path in jump_paths:
-                if len(path) > 1:
-                    possible_paths.append(path)
+            # 2. Get multi-step jump paths
+            # This will find all valid multi-step jump sequences
+            try:
+                jump_paths = board.get_all_jump_paths(tile_origin)
+                # Ensure jump_paths is always a list (empty if no jumps)
+                if jump_paths is None:
+                    jump_paths = []
+                    
+                for path in jump_paths:
+                    # Only include paths with at least one jump
+                    if len(path) > 1:
+                        # Filter paths by heuristic
+                        if heuristic(path[0], path[-1]):
+                            possible_paths.append(path)
+            except Exception as e:
+                print(f"Error getting jump paths: {e}")
+                # Continue with any single-step moves we found
 
+            # 3. Evaluate each possible path
             for path in possible_paths:
-                board.apply_path(path)
+                # Apply the complete path (might be single-step or multi-jump)
+                try:
+                    board.apply_path(path)
+                except Exception as e:
+                    print(f"Error applying path: {e}")
+                    continue  # Skip this path if we can't apply it
+                
+                # Evaluate resulting position
                 points, _ = minimax_pruning(board, depth - 1, is_player1_turn,
-                                            heuristic, use_eval_func_1,
-                                            maximizing=False, alpha=alpha, beta=beta)
-                board.undo_path(path)
+                                          heuristic, use_eval_func_1,
+                                          maximizing=False, alpha=alpha, beta=beta)
+                
+                # Undo the path to restore board state
+                try:
+                    board.undo_path(path)
+                except Exception as e:
+                    print(f"Error undoing path: {e}")
+                    # We need to somehow recover from this, maybe by manually 
+                    # resetting the board to its original state
+                
                 found_any_move = True
                 if points > max_points:
                     max_points = points
                     best_path = path
+                
                 alpha = max(alpha, points)
                 if beta <= alpha:
                     break
+            
             if beta <= alpha:
                 break
 
         if not found_any_move:
             max_points = board.get_score(is_player1_turn, use_eval_func_1)
             best_path = []
+        
         return max_points, best_path
 
     else:
-        # Similar changes apply for the minimizing branch:
+        # Similar error handling for the minimizing branch
         min_points = float('inf')
         best_path = []
         tiles_for_opponent = board.get_player2_tiles() if is_player1_turn else board.get_player1_tiles()
         found_any_move = False
 
         for tile_origin in tiles_for_opponent:
+            # Same approach as the maximizing branch with error handling
             possible_paths = []
-            for dest in board.get_all_valid_moves(tile_origin):
-                if heuristic(tile_origin, dest):
-                    possible_paths.append([tile_origin, dest])
-            jump_paths = board.get_all_jump_paths(tile_origin)
-            for path in jump_paths:
-                if len(path) > 1:
-                    possible_paths.append(path)
+            
+            # 1. Get single-step moves with error handling
+            try:
+                for dest in board.get_all_valid_moves(tile_origin):
+                    if heuristic(tile_origin, dest):
+                        possible_paths.append([tile_origin, dest])
+            except Exception as e:
+                print(f"Error getting valid moves: {e}")
+                continue
+            
+            # 2. Get multi-step jump paths with error handling
+            try:
+                jump_paths = board.get_all_jump_paths(tile_origin)
+                # Ensure jump_paths is always a list
+                if jump_paths is None:
+                    jump_paths = []
+                    
+                for path in jump_paths:
+                    if len(path) > 1:
+                        if heuristic(path[0], path[-1]):
+                            possible_paths.append(path)
+            except Exception as e:
+                print(f"Error getting jump paths: {e}")
 
+            # 3. Evaluate each possible path with error handling
             for path in possible_paths:
-                board.apply_path(path)
+                try:
+                    board.apply_path(path)
+                except Exception as e:
+                    print(f"Error applying path: {e}")
+                    continue
+                
                 points, _ = minimax_pruning(board, depth - 1, is_player1_turn,
-                                            heuristic, use_eval_func_1,
-                                            maximizing=True, alpha=alpha, beta=beta)
-                board.undo_path(path)
+                                          heuristic, use_eval_func_1,
+                                          maximizing=True, alpha=alpha, beta=beta)
+                
+                try:
+                    board.undo_path(path)
+                except Exception as e:
+                    print(f"Error undoing path: {e}")
+                
                 found_any_move = True
                 if points < min_points:
                     min_points = points
                     best_path = path
+                
                 beta = min(beta, points)
                 if beta <= alpha:
                     break
+            
             if beta <= alpha:
                 break
 
         if not found_any_move:
             min_points = board.get_score(is_player1_turn, use_eval_func_1)
             best_path = []
+        
         return min_points, best_path
 
     

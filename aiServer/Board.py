@@ -363,20 +363,51 @@ class Board():
     #         return all_paths
     
     def get_all_jump_paths(self, tile: Tile) -> list[list[Tile]]:
-        results = []
+        """
+        Finds all valid jump paths starting from the given tile.
+        Each path is a list of tiles: [start_tile, jump1, jump2, ...]
+        Returns an empty list if no jumps are possible.
+        """
+        # Always return a list (empty if no jumps), never None
+        if tile is None or tile.is_empty():
+            return []  # Return empty list instead of None
         
-        def dfs(current_tile, current_path, visited):
-            found_jump = False
-            for next_tile in self.get_jump_destinations(current_tile):
-                if next_tile not in visited and self.is_valid_jump(current_tile, next_tile):
-                    found_jump = True
-                    new_path = current_path + [next_tile]
-                    dfs(next_tile, new_path, visited | {next_tile})
-            if not found_jump and len(current_path) > 1:
-                results.append(current_path)
+        all_paths = []
+        visited = set([tile])
         
-        dfs(tile, [tile], {tile})
-        return results
+        def find_jumps(current_tile, current_path):
+            """Recursive helper to find all jump paths"""
+            # Check all directions for possible jumps
+            found_any_jump = False
+            
+            for direction, neighbor in current_tile.get_neighbours().items():
+                if neighbor is None or neighbor.is_empty():
+                    continue  # No piece to jump over
+                    
+                # There's a piece - check if we can jump over it
+                landing_tile = neighbor.get_neighbours().get(direction)
+                if landing_tile is None or not landing_tile.is_empty() or landing_tile in visited:
+                    continue  # Invalid landing spot
+                
+                # Valid jump found
+                found_any_jump = True
+                new_path = current_path + [landing_tile]
+                visited.add(landing_tile)
+                
+                # Recursively find more jumps from this position
+                find_jumps(landing_tile, new_path)
+                
+                # Backtrack
+                visited.remove(landing_tile)
+            
+            # If no further jumps were found, and we've moved at least once,
+            # this is a valid (possibly terminal) path
+            if not found_any_jump and len(current_path) > 1:
+                all_paths.append(current_path)
+    
+        # Start recursion from the initial tile
+        find_jumps(tile, [tile])
+        return all_paths  # This will be an empty list if no jumps found
 
     def apply_path(self, path: list[Tile]):
         """
@@ -425,5 +456,122 @@ class Board():
         current_tile by jumping over an adjacent occupied tile.
         """
         return landing_tile in self.get_jump_destinations(current_tile)
+    
+    def get_all_jump_paths(self, tile: Tile) -> list[list[Tile]]:
+        """
+        Finds all valid jump paths starting from the given tile.
+        Each path is a list of tiles: [start_tile, jump1, jump2, ...]
+        Returns multiple paths if there are branching possibilities.
+        """
+        if tile.is_empty():
+            return []  # No piece here, no paths possible
+        
+        all_paths = []
+        visited = set([tile])
+    
+    def find_jumps(current_tile, current_path):
+        """Recursive helper to find all jump paths"""
+        # Check all directions for possible jumps
+        found_any_jump = False
+        
+        for direction, neighbor in current_tile.get_neighbours().items():
+            if neighbor is None or neighbor.is_empty():
+                continue  # No piece to jump over
+                
+            # There's a piece - check if we can jump over it
+            landing_tile = neighbor.get_neighbours().get(direction)
+            if landing_tile is None or not landing_tile.is_empty() or landing_tile in visited:
+                continue  # Invalid landing spot
+            
+            # Valid jump found
+            found_any_jump = True
+            new_path = current_path + [landing_tile]
+            visited.add(landing_tile)
+            
+            # Recursively find more jumps from this position
+            find_jumps(landing_tile, new_path)
+            
+            # Backtrack
+            visited.remove(landing_tile)
+        
+        # If no further jumps were found, and we've moved at least once,
+        # this is a valid (possibly terminal) path
+        if not found_any_jump and len(current_path) > 1:
+            all_paths.append(current_path)
+    
+        # Start recursion from the initial tile
+        find_jumps(tile, [tile])
+        return all_paths
+
+    def apply_path(self, path: list[Tile]):
+        """
+        Apply a complete path by moving the piece from the first tile to the last,
+        through all intermediate tiles.
+        """
+        if not path or len(path) < 2:
+            return False  # Invalid path
+        
+        # Get the piece from the first tile
+        piece = path[0].get_piece()
+        if piece is None:
+            return False  # No piece to move
+        
+        # Move the piece through the path
+        for i in range(len(path) - 1):
+            current_tile = path[i]
+            next_tile = path[i + 1]
+            
+            # Verify next tile is empty
+            if not next_tile.is_empty():
+                return False  # Can't move to a non-empty tile
+            
+            # Move the piece one step
+            next_tile.set_piece(piece)
+            current_tile.set_empty()
+        
+        return True
+
+    def undo_path(self, path: list[Tile]):
+        """
+        Undo a path by moving the piece from the last tile back to the first.
+        Used for minimax search to restore board state after evaluation.
+        """
+        if not path or len(path) < 2:
+            return False
+        
+        # Get the piece from the last tile
+        piece = path[-1].get_piece()
+        if piece is None:
+            return False  # Something went wrong, no piece at the end
+        
+        # Move the piece back through the path in reverse
+        for i in range(len(path) - 1, 0, -1):
+            current_tile = path[i]
+            prev_tile = path[i - 1]
+            
+            # Move the piece one step back
+            prev_tile.set_piece(piece)
+            current_tile.set_empty()
+        
+        return True
+
+    def validate_jump(self, from_tile: Tile, to_tile: Tile) -> bool:
+        """
+        Validates if a jump from from_tile to to_tile is legal.
+        In Chinese Checkers, a jump requires a piece in between.
+        """
+        # Direct neighbors can just move (no jump needed)
+        if to_tile in from_tile.get_neighbours().values():
+            return True
+            
+        # For a jump, we need to find a piece in between
+        for direction, neighbor in from_tile.get_neighbours().items():
+            if neighbor is not None and not neighbor.is_empty():
+                # There's a piece we might jump over
+                jump_landing = neighbor.get_neighbours().get(direction)
+                if jump_landing == to_tile:
+                    return True  # Valid jump
+        
+        return False  # No valid jump path found
 
 
