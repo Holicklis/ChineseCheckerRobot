@@ -251,11 +251,10 @@ def health_check():
     """Health check endpoint"""
     return jsonify({"status": "ok"})
 
-@app.route('/get_ai_move', methods=['POST'])
-def get_ai_move():
+
     """
-    Returns the best move sequence for the current board state.
-    The AI will handle path finding internally, including all intermediate jumps.
+    Get the best multi-step move sequence for the current board state,
+    returning an array of coordinates that includes intermediate jumps.
     """
     try:
         # Get request data
@@ -268,59 +267,82 @@ def get_ai_move():
         eval_func = data.get('eval_func', DEFAULT_EVAL_FUNC)
         use_heuristic = data.get('use_heuristic', USE_HEURISTIC)
         
-        # Normalize and update board state
+        # Use the board state parser to normalize the format
         board_matrix = normalize_board_state(board_state)
+        
+        # Update the internal board state
         board_mapper.update_board_from_matrix(board_matrix)
         
-        # Log the current board
-        logger.info("\n" + board_mapper.board.to_string())
+        board_str = board_mapper.board.to_string()
+        logger.info("\n" + board_str)
         
-        # Save debug board state
+        # Save the board state before AI move
         timestamp = int(time.time())
-        debug_filename = f"board_before_move_{timestamp}.txt"
-        board_mapper.save_debug_board_file(debug_filename, board_state)
+        board_mapper.save_debug_board_file(
+            f"board_before_move_{timestamp}.txt",
+            board_state
+        )
         
-        # Get AI move with complete path (including jumps)
-        # The path is already complete as the AI handles jump paths internally
-        path_tiles = board_mapper.get_ai_move_sequence(is_player1, depth, eval_func, use_heuristic)
+        # Get the AI's multi-step path
+        path_coords = board_mapper.get_ai_move_sequence(is_player1, depth, eval_func, use_heuristic)
         
-        # If no valid move found
-        if not path_tiles or len(path_tiles) < 2:
+        # If no move is possible, return appropriate status
+        if not path_coords or len(path_coords) < 2:
             logger.warning("No valid moves found")
             return jsonify({
                 "status": "no_move_possible", 
                 "message": "No valid moves found for the current board state"
             }), 200
         
-        # Convert tile path to coordinates
-        path_coords = [board_mapper.get_coord_of_tile(tile) for tile in path_tiles]
-        logger.info(f"AI generated path: {path_coords}")
+        # Check if we need to find intermediate jumps
+        start_coords = path_coords[0]
+        end_coords = path_coords[-1]
+        
+        # Log the initial path
+        logger.info(f"Initial path from AI: {path_coords}")
+        
+        # For distance greater than 1, find the complete jump path
+        dist_x = abs(end_coords[0] - start_coords[0])
+        dist_y = abs(end_coords[1] - start_coords[1])
+        
+        if dist_x > 1 or dist_y > 1 or len(path_coords) == 2:
+            logger.info("Path appears to require jumps, finding complete path...")
+            complete_path = find_jump_path(board_mapper, start_coords, end_coords)
+            
+            if complete_path and len(complete_path) > len(path_coords):
+                logger.info(f"Found complete path with jumps: {complete_path}")
+                path_coords = complete_path
+            else:
+                logger.warning("Could not find a valid jump path!")
+        
+        # Save the board state with the move sequence
+        board_mapper.save_debug_board_file(
+            f"board_with_move_{timestamp}.txt",
+            board_state,
+            path_coords
+        )
         
         # Validate the move sequence
         is_valid, reason = board_mapper.validate_move_sequence(path_coords)
-        
-        # Save debug board with the move
-        debug_filename = f"board_with_move_{timestamp}.txt"
-        board_mapper.save_debug_board_file(debug_filename, board_state, path_coords)
-        
         if not is_valid:
             logger.warning(f"AI generated invalid move: {reason}")
             return jsonify({
                 "status": "invalid_move",
                 "message": f"AI generated an invalid move: {reason}",
                 "move_sequence": [{"x": x, "y": y} for x, y in path_coords],
-                "debug_file": debug_filename
+                "debug_file": f"board_with_move_{timestamp}.txt"
             }), 200
         
-        # Convert to JSON-friendly format
-        move_sequence = [{"x": x, "y": y} for x, y in path_coords]
+        # Build JSON-friendly structure
+        move_sequence = []
+        for (x, y) in path_coords:
+            move_sequence.append({"x": x, "y": y})
         
         response = {
             "status": "success",
             "move_sequence": move_sequence,
-            "debug_file": debug_filename
+            "debug_file": f"board_with_move_{timestamp}.txt"
         }
-        
         logger.info(f"Sending response: {response}")
         return jsonify(response)
     
@@ -591,49 +613,52 @@ def find_jump_path(board_mapper, start_coords, end_coords):
     end_tile = board_mapper.get_tile_at_coord(end_x, end_y)
     
     if start_tile is None or end_tile is None:
+        logger.warning(f"Invalid coordinates: start ({start_x},{start_y}) or end ({end_x},{end_y})")
         return None
     
     # Check if this is an adjacent move (not a jump)
     for direction, neighbor in start_tile.get_neighbours().items():
         if neighbor == end_tile:
-            # This is a direct adjacent move
+            # Adjacent move - no intermediate steps needed
             return [start_coords, end_coords]
     
-    # Try to find a jump path using BFS
+    # Need to find a jump path
+    logger.info(f"Finding jump path from ({start_x},{start_y}) to ({end_x},{end_y})")
+    
+    # Use BFS to find the shortest valid jump path
     queue = [(start_tile, [start_coords])]
-    visited = {start_tile}
+    visited = set([start_tile])
     
     while queue:
         current_tile, current_path = queue.pop(0)
         
-        # Get all possible jump destinations from current_tile
-        jump_destinations = []
+        # Get all possible jump destinations from current tile
         for direction, neighbor in current_tile.get_neighbours().items():
-            if neighbor is not None and not neighbor.is_empty():
-                # There's a piece we can potentially jump over
-                landing = neighbor.get_neighbours().get(direction)
-                if landing is not None and landing.is_empty() and landing not in visited:
-                    jump_destinations.append(landing)
-        
-        # Process each jump destination
-        for dest in jump_destinations:
-            # Get coordinates of this destination
-            dest_coords = board_mapper.get_coord_of_tile(dest)
-            if dest_coords is None:
+            if neighbor is None or neighbor.is_empty():
+                continue  # No piece to jump over
+            
+            # We found a piece to potentially jump over
+            jump_landing = neighbor.get_neighbours().get(direction)
+            if jump_landing is None or not jump_landing.is_empty() or jump_landing in visited:
+                continue  # Invalid landing spot
+            
+            # Valid jump found
+            jump_coords = board_mapper.get_coord_of_tile(jump_landing)
+            if jump_coords is None:
                 continue
                 
-            # Create the new path with this jump
-            new_path = current_path + [dest_coords]
+            new_path = current_path + [jump_coords]
             
             # If we've reached the target, return the path
-            if dest == end_tile:
+            if jump_landing == end_tile:
+                logger.info(f"Found jump path with {len(new_path)} steps: {new_path}")
                 return new_path
             
             # Otherwise, continue searching from this position
-            visited.add(dest)
-            queue.append((dest, new_path))
+            visited.add(jump_landing)
+            queue.append((jump_landing, new_path))
     
-    # No path found
+    logger.warning(f"No valid jump path found from ({start_x},{start_y}) to ({end_x},{end_y})")
     return None
 
 def trace_jump_paths(board_mapper, tile):
@@ -648,70 +673,133 @@ def trace_jump_paths(board_mapper, tile):
         logger.info(f"Path {i+1}: {path_coords}")
     
     return paths
-@app.route('/test_position', methods=['POST'])
-def test_position():
+
+@app.route('/get_ai_move', methods=['POST'])
+def get_ai_move():
     """
-    Test endpoint that returns what piece is at a specific position.
-    Useful for debugging coordinate mapping issues.
+    Get the best multi-step move sequence for the current board state,
+    handling the case where AI returns Tile objects directly.
     """
     try:
+        # Get request data
         data = request.json
+        logger.info(f"Received request: {json.dumps(data)}")
+        
         board_state = data.get('board_state', [])
-        x = data.get('position_x')
-        y = data.get('position_y')
+        is_player1 = data.get('is_player1', False)
+        depth = data.get('depth', DEFAULT_DEPTH)
+        eval_func = data.get('eval_func', DEFAULT_EVAL_FUNC)
+        use_heuristic = data.get('use_heuristic', USE_HEURISTIC)
         
-        if x is None or y is None:
-            return jsonify({"status": "error", "message": "Missing coordinates"}), 400
-        
-        # Log the raw board state
-        logger.info(f"Raw board state:")
-        for row in board_state:
-            logger.info(row)
-        
-        # Normalize and update board state
+        # Use the board state parser to normalize the format
         board_matrix = normalize_board_state(board_state)
+        
+        # Update the internal board state
         board_mapper.update_board_from_matrix(board_matrix)
         
-        # Log the board for reference
-        logger.info("\nBoard after normalization:")
-        logger.info("\n" + board_mapper.board.to_string())
+        board_str = board_mapper.board.to_string()
+        logger.info("\n" + board_str)
         
-        # Check the requested position
-        tile = board_mapper.get_tile_at_coord(x, y)
+        # Save the board state before AI move
+        timestamp = int(time.time())
+        board_mapper.save_debug_board_file(
+            f"board_before_move_{timestamp}.txt",
+            board_state
+        )
         
-        if tile is None:
+        # Get the AI's multi-step path (returns Tile objects)
+        path_tiles = board_mapper.get_ai_move_sequence(is_player1, depth, eval_func, use_heuristic)
+        
+        # If no move is possible, return appropriate status
+        if not path_tiles or len(path_tiles) < 2:
+            logger.warning("No valid moves found")
             return jsonify({
-                "status": "error", 
-                "message": f"No tile at ({x},{y})",
-                "raw_position": get_raw_position(board_state, x, y)
-            })
+                "status": "no_move_possible", 
+                "message": "No valid moves found for the current board state"
+            }), 200
         
-        piece_info = "empty" if tile.is_empty() else tile.get_piece().get_color()
+        # Convert path of Tile objects to coordinates
+        path_coords = []
+        for tile in path_tiles:
+            coords = board_mapper.get_coord_of_tile(tile)
+            if coords is not None:
+                path_coords.append(coords)
         
-        # Also check the positions for jump path
-        neighbors_info = {}
-        for direction, neighbor in tile.get_neighbours().items():
-            if neighbor is None:
-                neighbors_info[direction] = None
-            else:
-                neighbor_piece = "empty" if neighbor.is_empty() else neighbor.get_piece().get_color()
-                neighbor_coords = board_mapper.get_coord_of_tile(neighbor)
-                neighbors_info[direction] = {
-                    "coords": neighbor_coords,
-                    "piece": neighbor_piece
-                }
+        # Log the converted path
+        logger.info(f"Initial path from AI as coordinates: {path_coords}")
         
-        return jsonify({
+        # If we couldn't convert all tiles to coordinates
+        if len(path_coords) != len(path_tiles):
+            logger.warning("Some tiles could not be converted to coordinates")
+        
+        # If we have at least a start and end point
+        if len(path_coords) >= 2:
+            # Check if this is a multi-step jump that needs intermediate steps
+            start_coords = path_coords[0]
+            end_coords = path_coords[-1]
+            
+            # Get distance between start and end
+            dist_x = abs(end_coords[0] - start_coords[0])
+            dist_y = abs(end_coords[1] - start_coords[1])
+            
+            # If distance is greater than 1 in any direction, find intermediate jumps
+            if dist_x > 1 or dist_y > 1:
+                logger.info("Path appears to require jumps, finding complete path...")
+                
+                # Get the start and end tiles
+                start_tile = board_mapper.get_tile_at_coord(start_coords[0], start_coords[1])
+                end_tile = board_mapper.get_tile_at_coord(end_coords[0], end_coords[1])
+                
+                if start_tile is not None and end_tile is not None:
+                    # Find all intermediate jumps
+                    complete_path = find_jump_path(board_mapper, start_coords, end_coords)
+                    
+                    if complete_path and len(complete_path) > len(path_coords):
+                        logger.info(f"Found complete path with jumps: {complete_path}")
+                        path_coords = complete_path
+        
+        # If we couldn't find a valid path with coordinates
+        if not path_coords or len(path_coords) < 2:
+            logger.warning("Failed to get or create a valid path with coordinates")
+            return jsonify({
+                "status": "invalid_move",
+                "message": "Failed to create a valid move path",
+                "debug_file": f"board_before_move_{timestamp}.txt"
+            }), 200
+        
+        # Save the board state with the move sequence
+        board_mapper.save_debug_board_file(
+            f"board_with_move_{timestamp}.txt",
+            board_state,
+            path_coords
+        )
+        
+        # Validate the move sequence
+        is_valid, reason = board_mapper.validate_move_sequence(path_coords)
+        if not is_valid:
+            logger.warning(f"AI generated invalid move: {reason}")
+            return jsonify({
+                "status": "invalid_move",
+                "message": f"AI generated an invalid move: {reason}",
+                "move_sequence": [{"x": x, "y": y} for x, y in path_coords],
+                "debug_file": f"board_with_move_{timestamp}.txt"
+            }), 200
+        
+        # Build JSON-friendly structure
+        move_sequence = []
+        for (x, y) in path_coords:
+            move_sequence.append({"x": x, "y": y})
+        
+        response = {
             "status": "success",
-            "position": {"x": x, "y": y},
-            "piece": piece_info,
-            "is_empty": tile.is_empty(),
-            "neighbors": neighbors_info,
-            "raw_position": get_raw_position(board_state, x, y)
-        })
+            "move_sequence": move_sequence,
+            "debug_file": f"board_with_move_{timestamp}.txt"
+        }
+        logger.info(f"Sending response: {response}")
+        return jsonify(response)
     
     except Exception as e:
-        logger.error(f"Error in test_position: {str(e)}", exc_info=True)
+        logger.error(f"Error processing request: {str(e)}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500
 
 def get_raw_position(board_state, x, y):
