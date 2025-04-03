@@ -238,9 +238,22 @@ public class RobotController {
     }
 
     public void setTorque(float torque) {
-        String jsonCmd = String.format("{\"T\":104,\"t\":%.2f}", torque);
-        sendHttpCommand(jsonCmd);
-        Log.d(TAG, String.format("Setting torque to %.2f", torque));
+        //existing x y z
+        JSONObject currentPos = getPositionFeedback();
+        float currentX = 0;
+        float currentY = 0;
+        float currentZ = 0;
+        if (currentPos != null) {
+            try {
+                currentX = (float) currentPos.getDouble("x");
+                currentY = (float) currentPos.getDouble("y");
+                currentZ = (float) currentPos.getDouble("z");
+            } catch (JSONException e) {
+                Log.e(TAG, "Error parsing position data: " + e.getMessage());
+            }
+        }
+        String jsonCmd = String.format("{\"T\":104,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"t\":%.2f,\"spd\":%.2f}",
+                currentX, currentY, currentZ, torque, DEFAULT_SPEED);
     }
 
     public CompletableFuture<Boolean> executeVerifiedMovement(
