@@ -724,8 +724,9 @@ public class IntegratedAIGameFragment extends Fragment {
             Thread.sleep(GRIPPER_WAIT_MS);
 
             //step 2.5, make torque to 0
-            robotController.setTorque(1.2f);
-            Thread.sleep(2000);
+//            robotController.setTorque(1.2f);
+//            Thread.sleep(2000);         robotController.setTorque(1.2f);
+//            Thread.sleep(2000);
 
             // Step 3: Move through the remaining coordinates
             for (int i = 1; i < path.size(); i++) {

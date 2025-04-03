@@ -225,7 +225,7 @@ public class BoardCoordinatesAdapter {
 
         addMapping(centralX+2, centralY-4,
                 /*gridX*/ 12, /*gridY*/ 4,
-                /*x*/ centralCoordinateX+xDis*4-2f, /*y*/ centralCoordinateY, /*z*/ centralCoordinateZ+10f,
+                /*x*/ centralCoordinateX+xDis*4+8f, /*y*/ centralCoordinateY+4f, /*z*/ centralCoordinateZ+10f,
                 centralCoordinateTorque+0.2f);
 
         addMapping(centralX+3, centralY-4,
