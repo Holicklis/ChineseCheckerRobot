@@ -237,6 +237,12 @@ public class RobotController {
                 DEFAULT_POSITION_TOLERANCE, DEFAULT_MAX_RETRIES, callback);
     }
 
+    public void setTorque(float torque) {
+        String jsonCmd = String.format("{\"T\":104,\"t\":%.2f}", torque);
+        sendHttpCommand(jsonCmd);
+        Log.d(TAG, String.format("Setting torque to %.2f", torque));
+    }
+
     public CompletableFuture<Boolean> executeVerifiedMovement(
             float targetX, float targetY, float targetZ, float targetTorque,
             float tolerance, int maxRetries, MovementCallback callback) {
