@@ -46,16 +46,16 @@ class BoardMapper:
         # Store mappings between coordinates and tiles
         self.coord_to_tile: Dict[Tuple[int, int], Tile] = {}
         self.tile_to_coord: Dict[Tile, Tuple[int, int]] = {}
+        self.row_offsets = [0] * 17
         self._init_mappings()
         
     def _init_mappings(self):
         """Create mappings between coordinate representation and internal tiles"""
         # row_offsets = [6, 5, 4, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 4, 5, 6]
-        row_offsets = [0]*17 
         for i, row in enumerate(self.board.board_row_tiles):
             for j, tile in enumerate(row):
                 # Calculate x,y coordinates
-                x = j + row_offsets[i]
+                x = j + self.row_offsets[i]
                 y = i
                 self.coord_to_tile[(x, y)] = tile
                 self.tile_to_coord[tile] = (x, y)
@@ -387,8 +387,8 @@ def debug_board_state():
         if len(board_matrix) > 13:
             for x in range(len(board_matrix[13])):
                 cell_val = board_matrix[13][x]
-                # Get the mapped coordinates
-                mapped_x = x + board_mapper._init_mappings.__closure__[0].cell_value[13]  # Access the offset
+                # Get the mapped coordinates using the row offsets instance variable
+                mapped_x = x + board_mapper.row_offsets[13]
                 tile = board_mapper.get_tile_at_coord(mapped_x, 13)
                 if tile is not None:
                     is_empty = tile.is_empty()
@@ -406,7 +406,7 @@ def debug_board_state():
             "input_board": board_state,
             "normalized_matrix": board_matrix,
             "row_13_detail": row_13_info,
-            "offsets": board_mapper._init_mappings.__closure__[0].cell_value
+            "offsets": board_mapper.row_offsets  # Changed this line to use the instance variable
         })
     
     except Exception as e:

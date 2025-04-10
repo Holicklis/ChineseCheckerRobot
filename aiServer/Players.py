@@ -227,6 +227,11 @@ class Player_Computer(Player):
         print(f"AI Move Generation:")
         print(f"Player: {self.get_name()}")
         print(f"Score: {score}")
+        #print path
+        if best_path:
+            print(f"Best Path: {best_path.__str__()}")
+        else:
+            print("No valid path found.")
         print(f"Path Length: {len(best_path)}")
         if best_path:
             print("Path Details:")

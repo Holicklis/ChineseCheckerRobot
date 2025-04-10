@@ -33,6 +33,25 @@ TEST_BOARD_STATE = [
     "           X . ",
     "            X "
 ]
+# TEST_BOARD_STATE = [
+#     "            . ",
+#     "           . . ",
+#     "          . . . ",
+#     "         . . . . ",
+#     ". . . . . . . . . . . . . ",
+#     " . . . . . . . . . . . . ",
+#     "  . . . . . . . . . . . ",
+#     "   . . . . X X . . . . ",
+#     "    . . . X X X . . . ",
+#     "   . . . . X X . . . . ",
+#     "  . . . . X . X . . . . ",
+#     " . . . . . . X . . . . . ",
+#     ". . . . . O O . . . . . . ",
+#     "         O O O . ",
+#     "          O O O ",
+#     "           O . ",
+#     "            O "
+# ]
 
 def test_ai_jump_path():
     """Test the AI's ability to find and return complete jump paths"""
