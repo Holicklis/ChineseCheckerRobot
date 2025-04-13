@@ -471,7 +471,7 @@ public class BoardCoordinatesAdapter {
         for (int bx = 5; bx <= 8; bx++) {
             addMapping(bx, 8,
                     /*gridX*/ 4+(bx-4)*2, /*gridY*/ 8,
-                    /*x*/ centralCoordinateX+10f, /*y*/ centralCoordinateY-23.0f *(bx-4), /*z*/ centralCoordinateZ,
+                    /*x*/ centralCoordinateX, /*y*/ centralCoordinateY-23.0f *(bx-4), /*z*/ centralCoordinateZ,
                     centralCoordinateTorque);
         }
 

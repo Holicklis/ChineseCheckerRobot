@@ -32,7 +32,7 @@ def test_server(base_url='http://localhost:5000'):
     try:
         # Test empty board upload
         logger.info("Testing empty board upload...")
-        empty_board_path = 'board_empty_test1.jpeg'
+        empty_board_path = 'received_empty_board.jpg'
         
         try:
             base64_image = encode_image(empty_board_path)
@@ -55,7 +55,7 @@ def test_server(base_url='http://localhost:5000'):
             
         # Test current board detection
         logger.info("\nTesting current board detection...")
-        current_board_path = 'board_current_red_test1.jpeg'
+        current_board_path = 'received_current_board.jpg'
         
         try:
             base64_image = encode_image(current_board_path)

@@ -107,8 +107,9 @@ def preprocess_image(image, max_dim=1600, debug=False): #1600 unit: pixel
 # Marble Detection Parameters (Predefined)
 # ---------------------------
 # Predefined HSV ranges for green marbles
-GREEN_LOWER = np.array([30, 60, 50])      # [H, S, V]
+GREEN_LOWER = np.array([36, 40, 40])
 GREEN_UPPER = np.array([86, 255, 255])
+
 
 # Predefined HSV ranges for red marbles (two ranges to cover hue wrap-around)
 RED_LOWER1 = np.array([0, 100, 100])
@@ -531,14 +532,12 @@ def detect_marbles(hsv_image, draw_image, board_contour, debug = False):
     
     #save greenmask to directory debug_images
     cv2.imwrite('debug_images/green_mask.jpg', green_mask)
+    cv2.imwrite('debug_images/red_mask.jpg', red_mask)
     
     red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel, iterations=2)
     red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
     
-    # FOR DEBUG: Show these masks
-    if debug:
-        cv2.imshow("Green Mask", green_mask)
-        cv2.imshow("Red Mask", red_mask)    
+
     
     # Detect circles
     green_marbles = detect_and_draw_circles(green_mask, draw_image, "green", board_contour)
