@@ -13,33 +13,38 @@ public class MainActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
 
-        BottomNavigationView navView = findViewById(R.id.bottomNavigationView);
-        navView.setOnItemSelectedListener(item -> {
-            Fragment selectedFragment = null;
-            int itemId = item.getItemId();
-
-            if (itemId == R.id.navigation_control) {
-                selectedFragment = new RobotControlFragment();
-            } else if (itemId == R.id.navigation_camera) {
-                selectedFragment = new CameraFragment();
-            } else if (itemId == R.id.navigation_board) {
-                selectedFragment = new BoardFragment();
-            } else if (itemId == R.id.navigation_ai) {
-                selectedFragment = new IntegratedAIGameFragment();
-            }
-
-            if (selectedFragment != null) {
-                getSupportFragmentManager().beginTransaction()
-                        .replace(R.id.fragmentContainerView, selectedFragment)
-                        .commit();
-                return true;
-            }
-            return false;
-        });
+//        BottomNavigationView navView = findViewById(R.id.bottomNavigationView);
+//        navView.setOnItemSelectedListener(item -> {
+//            Fragment selectedFragment = null;
+//            int itemId = item.getItemId();
+//
+//            if (itemId == R.id.navigation_control) {
+//                selectedFragment = new RobotControlFragment();
+//            } else if (itemId == R.id.navigation_camera) {
+//                selectedFragment = new CameraFragment();
+//            } else if (itemId == R.id.navigation_board) {
+//                selectedFragment = new BoardFragment();
+//            } else
+//
+//                if (itemId == R.id.navigation_ai) {
+//                selectedFragment = new IntegratedAIGameFragment();
+//            }
+//
+//            if (selectedFragment != null) {
+//                getSupportFragmentManager().beginTransaction()
+//                        .replace(R.id.fragmentContainerView, selectedFragment)
+//                        .commit();
+//                return true;
+//            }
+//            return false;
+//        });
 
         // Set default fragment
         if (savedInstanceState == null) {
-            navView.setSelectedItemId(R.id.navigation_control);
+//            navView.setSelectedItemId(R.id.navigation_control);
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fragmentContainerView, new IntegratedAIGameFragment())
+                    .commit();
         }
     }
 }
