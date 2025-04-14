@@ -920,7 +920,11 @@ def analyze_path():
         logger.error(f"Error in analyze_path: {str(e)}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# if __name__ == '__main__':
+#     port = int(os.environ.get('PORT_AI', 5002))
+#     logger.info(f"Starting Chinese Checkers AI server on port {port}")
+#     app.run(host='0.0.0.0', port=port, debug=True)
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT_AI', 5002))
+    port = int(os.environ.get('PORT', 5002))
     logger.info(f"Starting Chinese Checkers AI server on port {port}")
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
