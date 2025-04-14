@@ -1,5 +1,6 @@
 package hku.cs.fyp24057.chinesecheckerrobot;
 
+import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.media.MediaPlayer;
@@ -146,7 +147,7 @@ public class IntegratedAIGameFragment extends Fragment {
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        setupInputFields();
+//        setupInputFields();
 
         // Hook up UI
         previewView = view.findViewById(R.id.previewView);
@@ -278,7 +279,9 @@ public class IntegratedAIGameFragment extends Fragment {
         btnConfigureRobotIp.setOnClickListener(v -> showRobotIpConfigDialog());
 
         btnShowDebugInfo.setOnClickListener(v -> showDebugInfo());
-        btnLookupCoords.setOnClickListener(v -> lookupAndMoveToPosition());
+//        btnLookupCoords.setOnClickListener(v -> lookupAndMoveToPosition());
+        btnLookupCoords.setOnClickListener(v -> showBoardCoordsDialog());
+
 
         btnStartGripper.setOnClickListener(v -> {
             if (!isMoving) {
@@ -881,15 +884,15 @@ public class IntegratedAIGameFragment extends Fragment {
         Toast.makeText(requireContext(), "Debug info displayed", Toast.LENGTH_SHORT).show();
     }
 
-    private void lookupAndMoveToPosition() {
+    private void lookupAndMoveToPosition(int boardX, int boardY) {
         if (isMoving) {
             Toast.makeText(requireContext(), "Robot is currently moving. Please wait.", Toast.LENGTH_SHORT).show();
             return;
         }
 
         try {
-            int boardX = Integer.parseInt(etDebugBoardX.getText().toString().trim());
-            int boardY = Integer.parseInt(etDebugBoardY.getText().toString().trim());
+//            int boardX = Integer.parseInt(etDebugBoardX.getText().toString().trim());
+//            int boardY = Integer.parseInt(etDebugBoardY.getText().toString().trim());
             CellCoordinate coord = BoardCoordinatesAdapter.getInstance().getBoardCellCoordinate(boardX, boardY);
             if (coord == null) {
                 safeRunOnUiThread(() -> tvMappedPosition.setText("No mapping found for board coords (" + boardX + "," + boardY + ")"));
@@ -1024,35 +1027,35 @@ public class IntegratedAIGameFragment extends Fragment {
         }
     }
 
-    private void setupInputFields() {
-        // Set up proper keyboard handling for the debug coordinate input fields
-        View view = getView();
-        etDebugBoardX = view.findViewById(R.id.etDebugBoardX);
-        etDebugBoardY = view.findViewById(R.id.etDebugBoardY);
-
-        // Configure each input field to show keyboard when focused
-        setupEditTextKeyboard(etDebugBoardX);
-        setupEditTextKeyboard(etDebugBoardY);
-
-        // Set up keyboard done action to trigger coordinate lookup
-        etDebugBoardY.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_DONE ||
-                    actionId == EditorInfo.IME_ACTION_GO ||
-                    (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER &&
-                            event.getAction() == KeyEvent.ACTION_DOWN)) {
-
-                // Hide keyboard
-                InputMethodManager imm = (InputMethodManager) requireContext()
-                        .getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-
-                // Trigger the lookup
-                lookupAndMoveToPosition();
-                return true;
-            }
-            return false;
-        });
-    }
+//    private void setupInputFields() {
+//        // Set up proper keyboard handling for the debug coordinate input fields
+//        View view = getView();
+//        etDebugBoardX = view.findViewById(R.id.etDebugBoardX);
+//        etDebugBoardY = view.findViewById(R.id.etDebugBoardY);
+//
+//        // Configure each input field to show keyboard when focused
+//        setupEditTextKeyboard(etDebugBoardX);
+//        setupEditTextKeyboard(etDebugBoardY);
+//
+//        // Set up keyboard done action to trigger coordinate lookup
+//        etDebugBoardY.setOnEditorActionListener((v, actionId, event) -> {
+//            if (actionId == EditorInfo.IME_ACTION_DONE ||
+//                    actionId == EditorInfo.IME_ACTION_GO ||
+//                    (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER &&
+//                            event.getAction() == KeyEvent.ACTION_DOWN)) {
+//
+//                // Hide keyboard
+//                InputMethodManager imm = (InputMethodManager) requireContext()
+//                        .getSystemService(Context.INPUT_METHOD_SERVICE);
+//                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+//
+//                // Trigger the lookup
+//                lookupAndMoveToPosition();
+//                return true;
+//            }
+//            return false;
+//        });
+//    }
 
     private void setupEditTextKeyboard(EditText editText) {
         // Make sure the EditText has proper input type
@@ -1078,4 +1081,55 @@ public class IntegratedAIGameFragment extends Fragment {
             }
         });
     }
+
+    private void showBoardCoordsDialog() {
+        // Inflate the dialog layout
+        LayoutInflater inflater = LayoutInflater.from(requireContext());
+        View dialogView = inflater.inflate(R.layout.dialog_board_coords, null);
+
+        EditText etBoardX = dialogView.findViewById(R.id.etBoardX);
+        EditText etBoardY = dialogView.findViewById(R.id.etBoardY);
+
+        // Create a dialog
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                .setTitle("Enter Board Coordinates")
+                .setView(dialogView)
+                .setPositiveButton("OK", null)  // We'll override the click later
+                .setNegativeButton("Cancel", (d, which) -> d.dismiss())
+                .create();
+
+        // Show the dialog so we can override the PositiveButton right away
+        dialog.show();
+
+        // Force the keyboard to appear for the first EditText
+        etBoardX.requestFocus();
+        etBoardX.post(() -> {
+            InputMethodManager imm = (InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.showSoftInput(etBoardX, InputMethodManager.SHOW_IMPLICIT);
+        });
+
+        // Override positive button click
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            // Validate input
+            String xStr = etBoardX.getText().toString().trim();
+            String yStr = etBoardY.getText().toString().trim();
+            if (xStr.isEmpty() || yStr.isEmpty()) {
+                Toast.makeText(requireContext(), "Please enter both X and Y", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            try {
+                int boardX = Integer.parseInt(xStr);
+                int boardY = Integer.parseInt(yStr);
+
+                // Pass the coordinates to your method that does the robot move
+                // or store them in your Fragment’s fields so you can use them later
+                lookupAndMoveToPosition(boardX, boardY);
+                dialog.dismiss();
+            } catch (NumberFormatException e) {
+                Toast.makeText(requireContext(), "Invalid numbers", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
 }
