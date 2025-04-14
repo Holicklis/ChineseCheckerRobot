@@ -826,7 +826,7 @@ public class BoardCoordinatesAdapter {
 
         addMapping(centralX-1, centralY+4,
                 /*gridX*/ 6, /*gridY*/ 12,
-                /*x*/ centralCoordinateX-xDis*4+3f, /*y*/ centralCoordinateY+56.5f, /*z*/ centralCoordinateZ+6f,
+                /*x*/ centralCoordinateX-xDis*4+1f, /*y*/ centralCoordinateY+56.5f, /*z*/ centralCoordinateZ+6f,
                 centralCoordinateTorque-0.2f);
 
         addMapping(centralX+0, centralY+4,
@@ -836,17 +836,17 @@ public class BoardCoordinatesAdapter {
 
         addMapping(centralX+1, centralY+4,
                 /*gridX*/ 10, /*gridY*/ 12,
-                /*x*/ centralCoordinateX-xDis*4-2f, /*y*/ centralCoordinateY+18f, /*z*/ centralCoordinateZ+9f,
+                /*x*/ centralCoordinateX-xDis*4-3f, /*y*/ centralCoordinateY+18f, /*z*/ centralCoordinateZ+9f,
                 centralCoordinateTorque-0.2f);
 
         addMapping(centralX+2, centralY+4, //6,12
                 /*gridX*/ 12, /*gridY*/ 12,
-                /*x*/ centralCoordinateX-xDis*4-2f, /*y*/ centralCoordinateY, /*z*/ centralCoordinateZ+10f,
+                /*x*/ centralCoordinateX-xDis*4-3f, /*y*/ centralCoordinateY, /*z*/ centralCoordinateZ+10f,
                 centralCoordinateTorque-0.2f);
 
         addMapping(centralX+3, centralY+4,
                 /*gridX*/ 14, /*gridY*/ 12,
-                /*x*/ centralCoordinateX-xDis*4, /*y*/ centralCoordinateY-22f, /*z*/ centralCoordinateZ+9f,
+                /*x*/ centralCoordinateX-xDis*4-4f, /*y*/ centralCoordinateY-22f, /*z*/ centralCoordinateZ+9f,
                 centralCoordinateTorque-0.2f);
 
         addMapping(centralX+4, centralY+4,
