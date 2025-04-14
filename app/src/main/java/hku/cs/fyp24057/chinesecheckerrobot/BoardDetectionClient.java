@@ -36,7 +36,9 @@ public class BoardDetectionClient {
         serverIp = serverIp.trim().replaceAll("/+$", "");
 
         // Format the base URL
-        this.serverUrl = String.format("http://%s:%d", serverIp, port);
+//        this.serverUrl = String.format("http://%s:%d", serverIp, port);
+        this.serverUrl = "https://chinesecheckerrobot-detection.onrender.com";
+        //web service now
 
         // Initialize OkHttpClient with timeouts
         this.client = new OkHttpClient.Builder()
