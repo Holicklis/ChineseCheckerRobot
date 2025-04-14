@@ -11,10 +11,17 @@ from detection_no_trackbars import (preprocess_image, detect_board, detect_marbl
 
 app = Flask(__name__)
 
-# Configure more detailed logging
+# # Configure more detailed logging
+# logging.basicConfig(
+#     level=logging.DEBUG,
+#     format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+# )
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
+    handlers=[
+        logging.StreamHandler()  # Log to stderr/stdout instead of files
+    ]
 )
 logger = logging.getLogger(__name__)
 

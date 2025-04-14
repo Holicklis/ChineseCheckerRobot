@@ -573,8 +573,10 @@ public class IntegratedAIGameFragment extends Fragment {
             jsonPayload.put("eval_func", 1);
             jsonPayload.put("use_heuristic", true);
 
-            String url = "http://" + serverIp + ":" + AI_PORT + "/get_ai_move";
+//            String url = "http://" + serverIp + ":" + AI_PORT + "/get_ai_move";
+            String url = "https://chinesecheckerrobot.onrender.com/get_ai_move";
             Request request = new Request.Builder()
+
                     .url(url)
                     .post(RequestBody.create(jsonPayload.toString(), JSON))
                     .build();
