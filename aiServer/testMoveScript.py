@@ -10,7 +10,7 @@ import sys
 import time
 
 # Configuration
-SERVER_URL = "https://chinesecheckerrobot.onrender.com"  # Change this to your server's URL
+SERVER_URL = "https://chinesecheckerrobot-zu9g.onrender.com"  # Change this to your server's URL
 # SERVER_URL = "http://localhost:5002"  # Change this to your server's URL
 AI_ENDPOINT = "/get_ai_move"
 

@@ -594,7 +594,7 @@ public class IntegratedAIGameFragment extends Fragment {
             jsonPayload.put("use_heuristic", true);
 
 //            String url = "http://" + serverIp + ":" + AI_PORT + "/get_ai_move";
-            String url = "https://chinesecheckerrobot.onrender.com/get_ai_move";
+            String url = "https://chinesecheckerrobot-zu9g.onrender.com/get_ai_move";
             Request request = new Request.Builder()
 
                     .url(url)

@@ -28,7 +28,7 @@ def encode_image(image_path):
         logger.error(f"Error encoding image {image_path}: {str(e)}")
         raise
 
-def test_server(base_url='https://chinesecheckerrobot-detection.onrender.com'):
+def test_server(base_url='https://chinesecheckerrobot-detection-6jg9.onrender.com'):
     try:
         # Test empty board upload
         logger.info("Testing empty board upload...")
@@ -79,4 +79,4 @@ def test_server(base_url='https://chinesecheckerrobot-detection.onrender.com'):
 
 if __name__ == '__main__':
     # Make sure we're using the same port as the server
-    test_server('https://chinesecheckerrobot-detection.onrender.com')
+    test_server('https://chinesecheckerrobot-detection-6jg9.onrender.com')
