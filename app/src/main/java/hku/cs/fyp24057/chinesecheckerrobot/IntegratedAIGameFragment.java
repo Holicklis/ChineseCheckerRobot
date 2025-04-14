@@ -93,6 +93,11 @@ public class IntegratedAIGameFragment extends Fragment {
     // Camera
     private ImageCapture imageCapture;
 
+    private enum AutoPlayState {
+        IDLE, DETECTING_BOARD, CALCULATING_MOVE, EXECUTING_MOVE, COMPLETED
+    }
+    private AutoPlayState autoPlayState = AutoPlayState.IDLE;
+
     // Network / Robot
     private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -383,7 +388,7 @@ public class IntegratedAIGameFragment extends Fragment {
             Toast.makeText(requireContext(), "Please capture empty board first", Toast.LENGTH_SHORT).show();
             return;
         }
-
+        autoPlayState = AutoPlayState.DETECTING_BOARD;
         // Play the sound effect
         playButtonSound();
 
@@ -431,6 +436,9 @@ public class IntegratedAIGameFragment extends Fragment {
                 safeRunOnUiThread(() -> {
                     tvAIResponse.append("\nMove execution complete!\n");
                     tvAIResponse.append("AutoPlay is finished.\n");
+                    pollHandler.removeCallbacksAndMessages(null);
+                    lastRecommendedMoveSequence = null;
+                    currentBoardState = null;
                 });
             } else {
                 safeRunOnUiThread(() -> tvAIResponse.append("."));
