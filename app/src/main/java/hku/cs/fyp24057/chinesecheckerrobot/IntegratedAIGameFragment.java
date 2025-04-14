@@ -1,16 +1,20 @@
 package hku.cs.fyp24057.chinesecheckerrobot;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Surface;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ScrollView;
@@ -141,6 +145,8 @@ public class IntegratedAIGameFragment extends Fragment {
     public void onViewCreated(@NonNull View view,
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        setupInputFields();
 
         // Hook up UI
         previewView = view.findViewById(R.id.previewView);
@@ -378,10 +384,13 @@ public class IntegratedAIGameFragment extends Fragment {
         // Play the sound effect
         playButtonSound();
 
-        safeRunOnUiThread(() -> tvAIResponse.setText("Starting autoPlay...\n1) Detecting current board...\n"));
-        // Call detectCurrentBoard() as if the button was pressed
-        detectCurrentBoard();
-        pollForBoardDetection();
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            // Continue with the rest of autoPlay logic
+            safeRunOnUiThread(() -> tvAIResponse.setText("Starting autoPlay...\n1) Detecting current board...\n"));
+            // Call detectCurrentBoard() as if the button was pressed
+            detectCurrentBoard();
+            pollForBoardDetection();
+        }, 100);
     }
 
     private void pollForBoardDetection() {
@@ -991,10 +1000,11 @@ public class IntegratedAIGameFragment extends Fragment {
     private void playButtonSound() {
         try {
             if (soundPlayer != null) {
+                soundPlayer.seekTo(0);
                 // If already playing, stop and reset
                 if (soundPlayer.isPlaying()) {
                     soundPlayer.stop();
-                    soundPlayer.seekTo(0);
+                    soundPlayer.prepare();
                 }
                 soundPlayer.start();
             }
@@ -1012,5 +1022,60 @@ public class IntegratedAIGameFragment extends Fragment {
             rootView.setFocusableInTouchMode(true);
             rootView.requestFocus();
         }
+    }
+
+    private void setupInputFields() {
+        // Set up proper keyboard handling for the debug coordinate input fields
+        View view = getView();
+        etDebugBoardX = view.findViewById(R.id.etDebugBoardX);
+        etDebugBoardY = view.findViewById(R.id.etDebugBoardY);
+
+        // Configure each input field to show keyboard when focused
+        setupEditTextKeyboard(etDebugBoardX);
+        setupEditTextKeyboard(etDebugBoardY);
+
+        // Set up keyboard done action to trigger coordinate lookup
+        etDebugBoardY.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE ||
+                    actionId == EditorInfo.IME_ACTION_GO ||
+                    (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER &&
+                            event.getAction() == KeyEvent.ACTION_DOWN)) {
+
+                // Hide keyboard
+                InputMethodManager imm = (InputMethodManager) requireContext()
+                        .getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+
+                // Trigger the lookup
+                lookupAndMoveToPosition();
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void setupEditTextKeyboard(EditText editText) {
+        // Make sure the EditText has proper input type
+        editText.setInputType(InputType.TYPE_CLASS_NUMBER);
+
+        // Set IME options
+        editText.setImeOptions(EditorInfo.IME_ACTION_DONE);
+
+        // Force the keyboard to show when this EditText is clicked
+        editText.setOnClickListener(v -> {
+            editText.requestFocus();
+            InputMethodManager imm = (InputMethodManager) requireContext()
+                    .getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
+        });
+
+        // Also force keyboard when focus is gained
+        editText.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                InputMethodManager imm = (InputMethodManager) requireContext()
+                        .getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.showSoftInput(v, InputMethodManager.SHOW_IMPLICIT);
+            }
+        });
     }
 }
