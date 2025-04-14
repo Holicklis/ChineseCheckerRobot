@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
+import glob
 import cv2
 import numpy as np
 import base64
@@ -217,6 +218,52 @@ def detect_current_state():
             
     except Exception as e:
         logger.error(f"Error detecting current state: {str(e)}")
+        logger.debug(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+    
+    
+@app.route('/list_debug_images', methods=['GET'])
+def list_debug_images():
+    """List all available debug images"""
+    try:
+        debug_dir = ensure_debug_dir()
+        # Get all image files in the debug directory
+        image_files = glob.glob(os.path.join(debug_dir, '*.jpg')) + \
+                      glob.glob(os.path.join(debug_dir, '*.png'))
+        
+        # Extract just the filenames without path
+        image_names = [os.path.basename(file) for file in image_files]
+        
+        return jsonify({
+            'status': 'success',
+            'images': image_names,
+            'count': len(image_names)
+        })
+    except Exception as e:
+        logger.error(f"Error listing debug images: {str(e)}")
+        logger.debug(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/download_debug_image/<filename>', methods=['GET'])
+def download_debug_image(filename):
+    """Download a specific debug image"""
+    try:
+        debug_dir = ensure_debug_dir()
+        file_path = os.path.join(debug_dir, filename)
+        
+        # Validate the file exists and is within the debug directory
+        if not os.path.exists(file_path) or not os.path.isfile(file_path):
+            return jsonify({'error': 'File not found'}), 404
+            
+        # Check if it's an image file
+        if not (filename.lower().endswith('.jpg') or 
+                filename.lower().endswith('.jpeg') or 
+                filename.lower().endswith('.png')):
+            return jsonify({'error': 'Invalid file type'}), 400
+            
+        return send_file(file_path, as_attachment=True)
+    except Exception as e:
+        logger.error(f"Error downloading debug image: {str(e)}")
         logger.debug(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
