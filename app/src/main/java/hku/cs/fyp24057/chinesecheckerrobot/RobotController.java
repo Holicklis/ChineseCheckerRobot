@@ -33,7 +33,7 @@ public class RobotController {
     private static final float DEFAULT_SPEED = 2f;  // Speed setting
     private static final int MOVEMENT_DELAY_MS = 2500;
     private static final int SHORT_DELAY_MS = 2500;
-    private static final float DEFAULT_POSITION_TOLERANCE = 2.0f;
+    private static final float DEFAULT_POSITION_TOLERANCE = 1.5f;
     private static final int DEFAULT_MAX_RETRIES = 3;
     private static final int VERIFICATION_DELAY_MS = 500;
     private static final float SAFE_Z = -60f;
