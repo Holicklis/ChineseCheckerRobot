@@ -82,8 +82,8 @@ def download_debug_images(server_url, download_dir):
 
 def main():
     parser = argparse.ArgumentParser(description="Download debug images from Chinese Checkers server")
-    parser.add_argument('--server', default='https://chinesecheckerrobot-detection.onrender.com',
-                        help='Server URL (default: https://chinesecheckerrobot-detection.onrender.com)')
+    parser.add_argument('--server', default='https://chinesecheckerrobot-detection-f78q.onrender.com',
+                        help='Server URL (default: https://chinesecheckerrobot-detection-f78q.onrender.com)')
     parser.add_argument('--output', default='./downloaded_debug_images',
                         help='Directory to save downloaded images (default: ./downloaded_debug_images)')
     
