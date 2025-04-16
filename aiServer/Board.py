@@ -212,6 +212,102 @@ class Board():
         for tile_destination in self.get_all_valid_moves(tile_origin):
             if heuristic_function(tile_origin, tile_destination):
                 yield tile_destination
+    def get_all_valid_logical_paths(self, tile_origin: Tile, heuristic_function=None) -> list[list[Tile]]:
+        """
+        Returns every possible complete path (list of Tiles) that the piece on tile_origin
+        can make in one turn, including:
+        - Single-step moves: [origin, neighbor]
+        - Multi-jump moves: [origin, jump1, jump2, ..., finalTile]
+
+        If 'heuristic_function' is provided, it is called once at the end to verify
+        (tile_origin, final_tile). If it returns False, that path is excluded.
+
+        Also respects the rule that if a piece starts in its finishing triangle,
+        it cannot leave that triangle in one turn.
+        """
+        # If there's no piece on tile_origin, no moves exist
+        if tile_origin.is_empty():
+            return []
+
+        piece = tile_origin.get_piece()
+        all_paths = []
+
+        ########################################################################
+        # 1) Single-step moves
+        ########################################################################
+        for neighbor in tile_origin.get_neighbours().values():
+            if neighbor is not None and neighbor.is_empty():
+                # Enforce triangle rule:
+                if piece.is_player2_piece() and (tile_origin in self.get_top_triangle_tiles()) and (neighbor not in self.get_top_triangle_tiles()):
+                    # Player2 piece can't leave top triangle
+                    continue
+                if piece.is_player1_piece() and (tile_origin in self.get_bottom_triangle_tiles()) and (neighbor not in self.get_bottom_triangle_tiles()):
+                    # Player1 piece can't leave bottom triangle
+                    continue
+
+                # Enforce heuristic if given (for the final move):
+                if heuristic_function is not None and not heuristic_function(tile_origin, neighbor):
+                    continue
+
+                # If it's valid, store [origin, neighbor]
+                all_paths.append([tile_origin, neighbor])
+
+        ########################################################################
+        # 2) Multi-jump moves via DFS
+        ########################################################################
+        jump_paths = []
+        visited = set()
+        visited.add(tile_origin)
+
+        def dfs_jumps(current_path: list[Tile]):
+            current_tile = current_path[-1]
+            found_jump = False
+
+            for direction, occupied_tile in current_tile.get_neighbours().items():
+                if occupied_tile is None or occupied_tile.is_empty():
+                    continue  # Need an occupied tile to jump over
+
+                # The landing tile in the same direction beyond that occupied tile
+                landing_tile = occupied_tile.get_neighbours().get(direction)
+                if landing_tile is None or (not landing_tile.is_empty()) or (landing_tile in visited):
+                    continue
+
+                # We can jump here
+                found_jump = True
+                visited.add(landing_tile)
+                current_path.append(landing_tile)
+
+                dfs_jumps(current_path)  # Check further jumps from there
+
+                # Backtrack
+                current_path.pop()
+                visited.remove(landing_tile)
+
+            # If no further jumps found AND the path length > 1, we have a valid jump chain
+            if not found_jump and len(current_path) > 1:
+                jump_paths.append(list(current_path))
+
+        dfs_jumps([tile_origin])
+
+        # Now filter the jump paths by triangle rules and optional heuristic
+        # It is permitted to move a marble into any hole on the board including holes in triangles belonging to other players. 
+        # However, once a marble has reached the opposite triangle, it may not be moved out of the triangle - only within the triangle.
+        for path in jump_paths:
+            final_tile = path[-1]
+
+            # Enforce triangle rule
+            if piece.is_player2_piece() and (tile_origin in self.get_top_triangle_tiles()) and (final_tile not in self.get_top_triangle_tiles()):
+                continue
+            if piece.is_player1_piece() and (tile_origin in self.get_bottom_triangle_tiles()) and (final_tile not in self.get_bottom_triangle_tiles()):
+                continue
+
+            # Enforce heuristic if given
+            if (heuristic_function is not None) and (not heuristic_function(tile_origin, final_tile)):
+                continue
+
+            all_paths.append(path)
+
+        return all_paths
 
                                     
     """Moves the piece in the arguments to the tile in the paramenters. If the movement is not possible it does nothing returns False"""
