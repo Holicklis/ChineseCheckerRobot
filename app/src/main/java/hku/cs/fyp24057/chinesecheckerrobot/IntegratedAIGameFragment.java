@@ -159,8 +159,8 @@ public class IntegratedAIGameFragment extends Fragment {
         tvBoardState = view.findViewById(R.id.tvBoardState);
         tvAIResponse = view.findViewById(R.id.tvAIResponse);
 
-        etDebugBoardX = view.findViewById(R.id.etDebugBoardX);
-        etDebugBoardY = view.findViewById(R.id.etDebugBoardY);
+//        etDebugBoardX = view.findViewById(R.id.etDebugBoardX);
+//        etDebugBoardY = view.findViewById(R.id.etDebugBoardY);
         tvMappedPosition = view.findViewById(R.id.tvMappedPosition);
 
         btnLookupCoords = view.findViewById(R.id.btnLookupCoords);
@@ -169,7 +169,7 @@ public class IntegratedAIGameFragment extends Fragment {
         btnDetectCurrent = view.findViewById(R.id.btnDetectCurrent);
         btnGetAIMove = view.findViewById(R.id.btnGetAIMove);
         btnExecuteMove = view.findViewById(R.id.btnExecuteMove);
-        btnConfigureServerIp = view.findViewById(R.id.btnConfigureServerIp);
+//        btnConfigureServerIp = view.findViewById(R.id.btnConfigureServerIp);
         btnConfigureRobotIp = view.findViewById(R.id.btnConfigureRobotIp);
         btnStartGripper = view.findViewById(R.id.btnStartGripper);
         btnStopGripper = view.findViewById(R.id.btnStopGripper);
@@ -280,7 +280,7 @@ public class IntegratedAIGameFragment extends Fragment {
             }
         });
 
-        btnConfigureServerIp.setOnClickListener(v -> showServerIpConfigDialog());
+//        btnConfigureServerIp.setOnClickListener(v -> showServerIpConfigDialog());
         btnConfigureRobotIp.setOnClickListener(v -> showRobotIpConfigDialog());
 
         btnShowDebugInfo.setOnClickListener(v -> showDebugInfo());
