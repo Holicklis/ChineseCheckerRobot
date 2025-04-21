@@ -1,6 +1,7 @@
 package hku.cs.fyp24057.chinesecheckerrobot;
 
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.util.Base64;
 import android.util.Log;
 import android.widget.Toast;
@@ -49,7 +50,7 @@ public class BoardDetectionClient {
         log.setLevel(HttpLoggingInterceptor.Level.BODY);
         client = new OkHttpClient.Builder()
                 .protocols(Collections.singletonList(Protocol.HTTP_1_1))
-//                .addInterceptor(log)
+                .addInterceptor(log)
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -71,10 +72,29 @@ public class BoardDetectionClient {
         return Base64.encodeToString(byteArray, Base64.DEFAULT);
     }
 
+    private Bitmap prepareForUpload(Bitmap original) {
+        // 1. resize
+        int maxSide = 1600;                // tune if you like
+        int w = original.getWidth(), h = original.getHeight();
+        float scale = (float) maxSide / Math.max(w, h);
+        Bitmap scaled = Bitmap.createScaledBitmap(
+                original,
+                Math.round(w * scale),
+                Math.round(h * scale),
+                true);
+
+        // 2. re‑compress (80 % JPEG → < 1 MB)
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        scaled.compress(Bitmap.CompressFormat.JPEG, 80, out);
+        return BitmapFactory.decodeByteArray(out.toByteArray(), 0, out.size());
+    }
+
+
     public void uploadEmptyBoard(Bitmap boardImage, DetectionCallback callback) {
         new Thread(() -> {
             try {
-                String base64Image = bitmapToBase64(boardImage);
+                Bitmap shrunk = prepareForUpload(boardImage);
+                String base64Image = bitmapToBase64(shrunk);
 
                 JSONObject json = new JSONObject();
                 json.put("image", base64Image);
@@ -110,7 +130,8 @@ public class BoardDetectionClient {
     public void detectCurrentState(Bitmap boardImage, DetectionCallback callback) {
         new Thread(() -> {
             try {
-                String base64Image = bitmapToBase64(boardImage);
+                Bitmap shrunk = prepareForUpload(boardImage);
+                String base64Image = bitmapToBase64(shrunk);
 
                 JSONObject json = new JSONObject();
                 json.put("image", base64Image);
