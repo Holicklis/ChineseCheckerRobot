@@ -452,14 +452,27 @@ public class IntegratedAIGameFragment extends Fragment {
     // ------------------------------------------------------------------
 
     private void captureEmptyBoard() {
+        if (imageCapture == null) {          // not ready yet
+            btnCaptureEmpty.postDelayed(this::captureEmptyBoard, 250);
+            return;
+        }
         btnCaptureEmpty.setEnabled(false);
+        Toast.makeText(requireContext(),
+                "Capturing empty board...",
+                Toast.LENGTH_SHORT).show();
         takePicture(true);
     }
 
     private void detectCurrentBoard() {
+        if (imageCapture == null) {          // same guard
+            btnDetectCurrent.postDelayed(this::detectCurrentBoard, 250);
+            return;
+        }
         btnDetectCurrent.setEnabled(false);
         takePicture(false);
     }
+
+
 
     private void takePicture(boolean isEmptyBoard) {
         if (imageCapture == null) {
@@ -478,6 +491,9 @@ public class IntegratedAIGameFragment extends Fragment {
                     public void onCaptureSuccess(@NonNull ImageProxy image) {
                         Bitmap bitmap = imageProxyToBitmap(image);
                         if (bitmap != null) {
+                            Toast.makeText(requireContext(),
+                                    "Image captured successfully",
+                                    Toast.LENGTH_SHORT).show();
                             processImage(bitmap, isEmptyBoard);
                         }
                         image.close();
@@ -502,6 +518,9 @@ public class IntegratedAIGameFragment extends Fragment {
 
     private void processImage(Bitmap bitmap, boolean isEmptyBoard) {
         if (isEmptyBoard) {
+            Toast.makeText(requireContext(),
+                    "Processing empty board...",
+                    Toast.LENGTH_SHORT).show();
             detectionClient.uploadEmptyBoard(bitmap, new BoardDetectionClient.DetectionCallback() {
                 @Override
                 public void onSuccess(List<String> boardState) {
@@ -951,30 +970,40 @@ public class IntegratedAIGameFragment extends Fragment {
     }
 
     private void startCamera() {
-        ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext());
-        cameraProviderFuture.addListener(() -> {
+        ListenableFuture<ProcessCameraProvider> fut =
+                ProcessCameraProvider.getInstance(requireContext());
+
+        fut.addListener(() -> {
             try {
-                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+                ProcessCameraProvider provider = fut.get();
+
                 Preview preview = new Preview.Builder()
                         .setTargetAspectRatio(AspectRatio.RATIO_4_3)
                         .build();
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
+
                 imageCapture = new ImageCapture.Builder()
-                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                         .setTargetAspectRatio(AspectRatio.RATIO_4_3)
-                        .setTargetRotation(Surface.ROTATION_0)
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                         .build();
-                CameraSelector cameraSelector = new CameraSelector.Builder()
-                        .requireLensFacing(CameraSelector.LENS_FACING_BACK)
-                        .build();
-                cameraProvider.unbindAll();
-                Camera camera = cameraProvider.bindToLifecycle(getViewLifecycleOwner(), cameraSelector, preview, imageCapture);
-                camera.getCameraControl().setLinearZoom(0f);
-                Log.d(TAG, "Camera started successfully");
-            } catch (ExecutionException | InterruptedException e) {
-                String msg = "Error starting camera: " + e.getMessage();
-                Log.e(TAG, msg, e);
-                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
+
+                provider.unbindAll();
+                provider.bindToLifecycle(
+                        getViewLifecycleOwner(),
+                        new CameraSelector.Builder()
+                                .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+                                .build(),
+                        preview,
+                        imageCapture);
+
+                // camera & imageCapture are ready – unlock UI
+                previewView.post(() -> {
+                    btnCaptureEmpty.setEnabled(true);
+                    btnDetectCurrent.setEnabled(hasEmptyBoard);
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "startCamera failed", e);
             }
         }, ContextCompat.getMainExecutor(requireContext()));
     }
@@ -1027,6 +1056,7 @@ public class IntegratedAIGameFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        if (imageCapture == null) startCamera();
         // Ensure the fragment's root view regains focus when resumed
         View rootView = getView();
         if (rootView != null) {

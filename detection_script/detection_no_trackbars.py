@@ -48,6 +48,7 @@ def automatic_brightness_and_contrast(image, clip_hist_percent=1):
 
     auto_result = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
     # cv2.imshow("Auto Brightness/Contrast", auto_result)
+
     return auto_result
 
 def preprocess_image(image, max_dim=1600, debug=False): #1600 unit: pixel
@@ -414,6 +415,30 @@ def assign_cells_to_layout(empty_cells, board_layout):
             f.write(f"{row}\n")
     return populated_layout
 
+def is_cell_occupied_by_color(hsv_img, cx, cy, radius,
+                              lower_hsv, upper_hsv,
+                              coverage_thresh=0.15):
+    """
+    Return True if at least `coverage_thresh` fraction of the
+    pixels inside the circle (cx, cy, radius) fall within [lower_hsv, upper_hsv].
+    """
+    # 1. Build the color mask
+    mask = cv2.inRange(hsv_img, lower_hsv, upper_hsv)
+
+    # 2. Create a boolean circle‐mask
+    h, w = mask.shape
+    Y, X = np.ogrid[:h, :w]
+    circle = (X - cx)**2 + (Y - cy)**2 <= radius**2
+
+    # 3. Compute coverage
+    pixels = mask[circle]
+    if pixels.size == 0:
+        return False
+    coverage = np.count_nonzero(pixels) / float(pixels.size)
+    return coverage >= coverage_thresh
+
+
+
 # ---------------------------
 # Marble Assignment and Visualization
 # ---------------------------
@@ -513,6 +538,29 @@ def detect_and_draw_circles(mask, image, color_name, board_contour):
                     f.write(f"Center: ({x_int}, {y_int})\n")
     return detected_marbles
 
+def occupancy_by_colour_ratio(cells, hsv_img):
+    occ = {}          # (cx,cy) -> None|'green'|'red'
+    cell_r = 22       # radius ≈ HOUGH_MAX_RADIUS – tune once
+    
+    green_mask = cv2.inRange(hsv_img, GREEN_LOWER, GREEN_UPPER)
+    red_mask1  = cv2.inRange(hsv_img, RED_LOWER1, RED_UPPER1)
+    red_mask2  = cv2.inRange(hsv_img, RED_LOWER2, RED_UPPER2)
+    red_mask   = cv2.bitwise_or(red_mask1, red_mask2)
+
+    for (cx,cy) in cells:
+        # Grab a circular ROI (boolean mask)
+        yy, xx = np.ogrid[:hsv_img.shape[0], :hsv_img.shape[1]]
+        circle = (xx - cx) ** 2 + (yy - cy) ** 2 <= cell_r ** 2
+
+        green_ratio = green_mask[circle].mean() / 255.0
+        red_ratio   = red_mask[circle].mean()   / 255.0
+
+        if   green_ratio > 0.15: occ[(cx,cy)] = 'green'
+        elif red_ratio   > 0.15: occ[(cx,cy)] = 'red'
+        else:                    occ[(cx,cy)] = None
+    return occ
+
+
 def detect_marbles(hsv_image, draw_image, board_contour, debug = False):
     """
     Using predefined HSV thresholds for green/red,
@@ -529,6 +577,11 @@ def detect_marbles(hsv_image, draw_image, board_contour, debug = False):
     kernel = np.ones((5, 5), np.uint8)
     green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_OPEN, kernel, iterations=2)
     green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    
+    kernel2 = np.ones((3,3), np.uint8)
+    green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel2, iterations=1)
+    red_mask   = cv2.morphologyEx(red_mask,   cv2.MORPH_CLOSE, kernel2, iterations=1)
+
     
     #save greenmask to directory debug_images
     cv2.imwrite('debug_images/green_mask.jpg', green_mask)
@@ -647,7 +700,8 @@ def main():
         while True:
             temp_display = current_blurred.copy()
             all_marbles = detect_marbles(current_hsv, temp_display, board_contour, debug=True)
-            cell_occupancy = assign_marbles_to_cells(empty_cells, all_marbles, base_threshold=BASE_THRESHOLD, debug=True)
+            # cell_occupancy = assign_marbles_to_cells(empty_cells, all_marbles, base_threshold=BASE_THRESHOLD, debug=True)
+            cell_occupancy = occupancy_by_colour_ratio(empty_cells, current_hsv)
 
             # Output debug information
             output_debug_info(empty_cells, all_marbles, cell_occupancy, filename='debug_mapping.txt')

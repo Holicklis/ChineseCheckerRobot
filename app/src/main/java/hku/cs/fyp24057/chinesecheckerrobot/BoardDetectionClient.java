@@ -3,6 +3,7 @@ package hku.cs.fyp24057.chinesecheckerrobot;
 import android.graphics.Bitmap;
 import android.util.Base64;
 import android.util.Log;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -10,14 +11,17 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
+import okhttp3.Protocol;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import okhttp3.logging.HttpLoggingInterceptor;
 
 public class BoardDetectionClient {
     private static final String TAG = "BoardDetectionClient";
@@ -41,11 +45,16 @@ public class BoardDetectionClient {
         //web service now
 
         // Initialize OkHttpClient with timeouts
-        this.client = new OkHttpClient.Builder()
+        HttpLoggingInterceptor log = new HttpLoggingInterceptor(msg -> Log.d(TAG, msg));
+        log.setLevel(HttpLoggingInterceptor.Level.BODY);
+        client = new OkHttpClient.Builder()
+                .protocols(Collections.singletonList(Protocol.HTTP_1_1))
+//                .addInterceptor(log)
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .build();
+
 
         Log.d(TAG, "Initialized with server URL: " + serverUrl);
     }
@@ -74,7 +83,7 @@ public class BoardDetectionClient {
                         .url(serverUrl + "/upload_empty_board")
                         .post(RequestBody.create(json.toString(), JSON))
                         .build();
-
+//                Toast.makeText(null, "Uploading empty board...", Toast.LENGTH_SHORT).show();
                 try (Response response = client.newCall(request).execute()) {
                     if (!response.isSuccessful()) {
                         throw new IOException("Unexpected response " + response);
@@ -84,6 +93,7 @@ public class BoardDetectionClient {
                     JSONObject jsonResponse = new JSONObject(responseData);
 
                     if (jsonResponse.has("error")) {
+//                        Toast.makeText(null, "Error: " + jsonResponse.getString("error"), Toast.LENGTH_SHORT).show();
                         callback.onError(jsonResponse.getString("error"));
                     } else {
                         callback.onSuccess(null); // No board state for empty board upload
