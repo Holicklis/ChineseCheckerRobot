@@ -42,7 +42,7 @@ The AI Server can be run locally or deployed to the cloud. For local setup:
    python aiserver.py
    ```
 
-By default, the server runs on port 5002. The server is also deployed to: `https://chinesecheckerrobot-zu9g.onrender.com/get_ai_move`
+By default, the server is also deployed to: `https://chinesecheckerrobot-zu9g.onrender.com/get_ai_move`
 
 ### Detection Server Setup
 
