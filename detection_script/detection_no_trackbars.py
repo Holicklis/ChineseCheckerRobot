@@ -659,7 +659,123 @@ def print_text_board(populated_layout, cell_occupancy):
             print(row_text)
             f.write(row_text + '\n')
 
+def occupancy_by_colour_ratio_nearest_marble(
+    cells,                # List of reference cell coordinates (cx, cy)
+    marbles,              # List of detected marbles (mx, my, radius, detected_color)
+    hsv_img,              # Current HSV image
+    max_association_distance=50, # Max distance between cell and marble center
+    ratio_threshold=0.15, # Min ratio of color pixels in sample area
+    debug=False
+):
+    """
+    Assigns occupancy ('green', 'red', or None) to each cell based on color ratios,
+    but samples the area around the NEAREST detected marble within a distance threshold.
 
+    Args:
+        cells: List of (cx, cy) tuples for reference cell locations.
+        marbles: List of (mx, my, radius, detected_color) tuples for detected marbles.
+        hsv_img: The HSV image of the current board state.
+        max_association_distance: Maximum distance allowed between a cell center (cx, cy)
+                                 and a marble center (mx, my) to consider them associated.
+        ratio_threshold: Minimum proportion of pixels within the sampling area that must
+                         match the target color.
+        debug: Print debug information.
+
+    Returns:
+        dict: { (cx, cy): "green" / "red" / None }
+    """
+    cell_occupancy = {c: None for c in cells} # Initialize all cells as empty
+    assigned_marble_indices = set() # Track which marbles have been assigned to a cell
+
+    # Pre-calculate masks for efficiency
+    green_mask = cv2.inRange(hsv_img, GREEN_LOWER, GREEN_UPPER)
+    red_mask1  = cv2.inRange(hsv_img, RED_LOWER1, RED_UPPER1)
+    red_mask2  = cv2.inRange(hsv_img, RED_LOWER2, RED_UPPER2)
+    red_mask   = cv2.bitwise_or(red_mask1, red_mask2)
+    h, w = hsv_img.shape[:2]
+
+    if not marbles: # Handle case with no detected marbles
+         logging.warning("No marbles detected to associate with cells.")
+         return cell_occupancy
+
+    # --- Step 1: For each cell, find the closest *unassigned* marble ---
+    potential_assignments = [] # Store potential (distance, cell_idx, marble_idx)
+    for i, (cx, cy) in enumerate(cells):
+        min_dist = float('inf')
+        best_marble_idx = -1
+        for j, (mx, my, mradius, mcolor) in enumerate(marbles):
+             dist = np.hypot(mx - cx, my - cy)
+             if dist < min_dist and dist < max_association_distance :
+                 min_dist = dist
+                 best_marble_idx = j
+
+        if best_marble_idx != -1:
+            potential_assignments.append({'dist': min_dist, 'cell_idx': i, 'marble_idx': best_marble_idx})
+
+    # --- Step 2: Sort potential assignments by distance (closest first) ---
+    # This helps ensure the best geometric matches are considered first.
+    potential_assignments.sort(key=lambda x: x['dist'])
+
+    # --- Step 3: Assign based on ratio check at the *marble's* location ---
+    assigned_cells = set() # Keep track of cells that have been filled
+    assigned_marbles = set() # Keep track of marbles that have been used
+
+    for assignment in potential_assignments:
+        cell_idx = assignment['cell_idx']
+        marble_idx = assignment['marble_idx']
+        cx, cy = cells[cell_idx]
+        mx, my, mradius, detected_color = marbles[marble_idx] # Use marble's info
+
+        # Skip if cell or marble is already assigned
+        if cell_idx in assigned_cells or marble_idx in assigned_marbles:
+            continue
+
+        # --- Perform Ratio Check CENTERED ON THE MARBLE (mx, my) ---
+        # Use the marble's detected radius for the sampling area
+        sample_radius = int(mradius) # Or use a fixed value like 20 if preferred
+        if sample_radius <= 0: sample_radius = 1 # Avoid zero radius
+
+        # Create a circular mask centered at the marble
+        Y, X = np.ogrid[:h, :w]
+        circle_mask = (X - mx)**2 + (Y - my)**2 <= sample_radius**2
+
+        # Calculate ratios within that specific circle mask
+        pixels_in_circle = np.sum(circle_mask)
+        if pixels_in_circle == 0:
+             if debug: logging.debug(f"Cell ({cx},{cy}) -> Marble ({mx},{my}) -> Zero pixels in sample radius {sample_radius}. Skipping.")
+             continue # Skip if the circle is somehow empty or off-image
+
+        green_pixels_in_circle = np.count_nonzero(green_mask[circle_mask])
+        red_pixels_in_circle = np.count_nonzero(red_mask[circle_mask])
+
+        green_ratio = green_pixels_in_circle / float(pixels_in_circle)
+        red_ratio = red_pixels_in_circle / float(pixels_in_circle)
+
+        assigned_color = None
+        if green_ratio >= ratio_threshold and green_ratio >= red_ratio: # Check green first
+             assigned_color = 'green'
+        elif red_ratio >= ratio_threshold: # Then check red
+             assigned_color = 'red'
+
+        # --- Final Assignment ---
+        if assigned_color is not None:
+            cell_occupancy[(cx, cy)] = assigned_color
+            assigned_cells.add(cell_idx)
+            assigned_marbles.add(marble_idx)
+            if debug:
+                logging.info(
+                    f"Cell ({cx},{cy}) -> Associated Marble ({mx},{my}, r={mradius}) "
+                    f"-> Ratios(G:{green_ratio:.2f}, R:{red_ratio:.2f}) "
+                    f"-> Assigned: {assigned_color} (Dist: {assignment['dist']:.1f})"
+                )
+        elif debug:
+             logging.info(
+                    f"Cell ({cx},{cy}) -> Associated Marble ({mx},{my}, r={mradius}) "
+                    f"-> Ratios(G:{green_ratio:.2f}, R:{red_ratio:.2f}) "
+                    f"-> Not assigned (ratio low) (Dist: {assignment['dist']:.1f})"
+                )
+
+    return cell_occupancy
 # ---------------------------
 # Main Function
 # ---------------------------
@@ -701,7 +817,15 @@ def main():
             temp_display = current_blurred.copy()
             all_marbles = detect_marbles(current_hsv, temp_display, board_contour, debug=True)
             # cell_occupancy = assign_marbles_to_cells(empty_cells, all_marbles, base_threshold=BASE_THRESHOLD, debug=True)
-            cell_occupancy = occupancy_by_colour_ratio(empty_cells, current_hsv)
+            # cell_occupancy = occupancy_by_colour_ratio(empty_cells, current_hsv)
+            cell_occupancy = occupancy_by_colour_ratio_nearest_marble(
+                cells=empty_cells,  # Use the reference cell list
+                marbles=all_marbles, # Pass the list of detected marbles
+                hsv_img=current_hsv,
+                max_association_distance=40, # Tune this distance
+                ratio_threshold=0.15,        # Tune this ratio
+                debug=True                   # Enable debug prints
+            )
 
             # Output debug information
             output_debug_info(empty_cells, all_marbles, cell_occupancy, filename='debug_mapping.txt')
