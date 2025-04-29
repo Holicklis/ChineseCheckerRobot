@@ -32,11 +32,11 @@ def ensure_debug_dir():
         os.makedirs(debug_dir)
     return debug_dir
 
-def save_debug_image(image, filename):
-    """Save image for debugging purposes with error handling"""
-    ok = cv2.imwrite(os.path.join(DEBUG_DIR, name), img)
+def save_debug_image(img, name):
+    ok = cv2.imwrite(os.path.join('debug_images', name), img)
     if not ok:
         logger.error("imwrite failed – path or permissions?")
+
 
 def decode_image(image_data):
     """Decode base64 image data to OpenCV format with enhanced error handling"""
