@@ -132,6 +132,110 @@ def upload_empty_board():
         logger.debug(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
+# @app.route('/detect_current_state', methods=['POST'])
+# def detect_current_state():
+#     global empty_board_image, board_contour, empty_cells
+    
+#     try:
+#         # Check if we have processed empty board
+#         if empty_board_image is None or empty_cells is None:
+#             return jsonify({'error': 'Empty board not processed yet'}), 400
+            
+#         # Get current board image
+#         data = request.get_json()
+#         if not data or 'image' not in data:
+#             return jsonify({'error': 'No image data received in request'}), 400
+            
+#         image_data = data['image']
+        
+#         # Decode image
+#         try:
+#             current_image = decode_image(image_data)
+#         except Exception as e:
+#             return jsonify({'error': f'Failed to decode image: {str(e)}'}), 400
+            
+#         save_debug_image(current_image, 'received_current_board.jpg')
+        
+#         # Process current board state
+#         try:
+#             # Using imported detector module
+#             blurred, hsv = detector.preprocess_image(current_image)
+            
+#             # APPROACH 1: Use the updated detect_marbles function
+#             marbles = detector.detect_marbles(hsv, blurred.copy(), board_contour, debug=True)
+            
+#             # If no marbles were detected, try direct cell analysis
+#             if not marbles:
+#                 logger.warning("No marbles detected with standard approach, trying direct cell analysis")
+#                 cell_occupancy = detector.detect_cell_occupancy_directly(empty_cells, hsv, debug=True)
+#                 if not any(value is not None for value in cell_occupancy.values()):
+#                     return jsonify({'error': 'No marbles detected on the board'}), 400
+#             else:
+#                 # Map marbles to cells 
+#                 cell_occupancy = detector.occupancy_by_colour_ratio_nearest_marble(
+#                     cells=empty_cells,
+#                     marbles=marbles,
+#                     hsv_img=hsv,
+#                     max_association_distance=40,
+#                     ratio_threshold=0.15,
+#                     debug=True
+#                 )
+            
+#             # Map cells to board layout
+#             populated_layout = detector.assign_cells_to_layout(empty_cells, detector.board_layout)
+            
+#             # Generate board state visualization
+#             visualization = blurred.copy()
+#             for (cx, cy), marble_color in cell_occupancy.items():
+#                 color = (0, 255, 0) if marble_color == "green" else \
+#                        (0, 0, 255) if marble_color == "red" else \
+#                        (255, 0, 0)
+#                 cv2.circle(visualization, (int(cx), int(cy)), 5, color, -1)
+                
+#                 # Also draw a larger circle to show the sampling area
+#                 # This is useful for debugging the color ratio approach
+#                 cv2.circle(visualization, (int(cx), int(cy)), 20, color, 1)
+                
+#             save_debug_image(visualization, 'board_state.jpg')
+            
+#             # Generate text representation
+#             board_state = []
+#             for row in populated_layout:
+#                 row_state = []
+#                 for cell in row:
+#                     if cell is None:
+#                         row_state.append('X')  # No cell detected here
+#                     else:
+#                         occupant = cell_occupancy.get(cell, None)
+#                         if occupant is None:
+#                             row_state.append('.')  # Empty cell
+#                         elif occupant == "green":
+#                             row_state.append('G')
+#                         elif occupant == "red":
+#                             row_state.append('R')
+#                         else:
+#                             row_state.append('?')
+#                 board_state.append(' '.join(row_state))
+            
+#             # Save board state to file
+#             with open('board_state.txt', 'w') as f:
+#                 for row in board_state:
+#                     f.write(f"{row}\n")
+            
+#             return jsonify({
+#                 'board_state': board_state,
+#                 'message': 'Board state detected successfully'
+#             })
+            
+#         except Exception as e:
+#             logger.error(f"Error in image processing: {str(e)}")
+#             logger.debug(traceback.format_exc())
+#             return jsonify({'error': f'Image processing failed: {str(e)}'}), 500
+            
+#     except Exception as e:
+#         logger.error(f"Error detecting current state: {str(e)}")
+#         logger.debug(traceback.format_exc())
+#         return jsonify({'error': str(e)}), 500
 @app.route('/detect_current_state', methods=['POST'])
 def detect_current_state():
     global empty_board_image, board_contour, empty_cells
@@ -160,40 +264,34 @@ def detect_current_state():
         try:
             # Using imported detector module
             blurred, hsv = detector.preprocess_image(current_image)
+            save_debug_image(blurred, 'preprocessed_current_board.jpg')
             
-            # APPROACH 1: Use the updated detect_marbles function
-            marbles = detector.detect_marbles(hsv, blurred.copy(), board_contour, debug=True)
+            # Use the improved direct cell occupancy detection
+            cell_occupancy = improved_cell_occupancy_detection(empty_cells, hsv, debug=True)
             
-            # If no marbles were detected, try direct cell analysis
-            if not marbles:
-                logger.warning("No marbles detected with standard approach, trying direct cell analysis")
-                cell_occupancy = detector.detect_cell_occupancy_directly(empty_cells, hsv, debug=True)
-                if not any(value is not None for value in cell_occupancy.values()):
-                    return jsonify({'error': 'No marbles detected on the board'}), 400
-            else:
-                # Map marbles to cells 
-                cell_occupancy = detector.occupancy_by_colour_ratio_nearest_marble(
-                    cells=empty_cells,
-                    marbles=marbles,
-                    hsv_img=hsv,
-                    max_association_distance=40,
-                    ratio_threshold=0.15,
-                    debug=True
-                )
-            
+            # Check if any marbles were detected
+            if not any(val is not None for val in cell_occupancy.values()):
+                logger.warning("No marbles detected in the board state")
+                
             # Map cells to board layout
             populated_layout = detector.assign_cells_to_layout(empty_cells, detector.board_layout)
             
             # Generate board state visualization
             visualization = blurred.copy()
             for (cx, cy), marble_color in cell_occupancy.items():
-                color = (0, 255, 0) if marble_color == "green" else \
-                       (0, 0, 255) if marble_color == "red" else \
-                       (255, 0, 0)
-                cv2.circle(visualization, (int(cx), int(cy)), 5, color, -1)
+                # Draw cell position
+                cv2.circle(visualization, (int(cx), int(cy)), 3, (255, 255, 255), -1)
                 
-                # Also draw a larger circle to show the sampling area
-                # This is useful for debugging the color ratio approach
+                # Draw color-coded circle based on detection
+                color = (0, 255, 0) if marble_color == "green" else \
+                        (0, 0, 255) if marble_color == "red" else \
+                        (255, 0, 0)  # Blue for empty
+                
+                # Draw a filled circle for the detected marble
+                if marble_color is not None:
+                    cv2.circle(visualization, (int(cx), int(cy)), 10, color, -1)
+                
+                # Draw the sampling circle used for detection
                 cv2.circle(visualization, (int(cx), int(cy)), 20, color, 1)
                 
             save_debug_image(visualization, 'board_state.jpg')

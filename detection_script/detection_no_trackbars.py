@@ -979,184 +979,6 @@ def occupancy_by_colour_ratio_nearest_marble(
                 )
 
     return cell_occupancy
-# ---------------------------
-# Main Function
-# ---------------------------
-def main():
-    try:
-        # Preprocess the empty board image
-        empty_image = cv2.imread("board_empty_test1.jpeg")
-        empty_blurred, empty_hsv = preprocess_image(empty_image, debug=True)
-        
-        # cv2.imshow("Empty Board", empty_blurred)
-
-        # Detect the hexagonal board contour
-        board_contour = detect_board(empty_blurred, debug=True)
-
-        if board_contour is None:
-            logging.error("Board contour not detected. Exiting.")
-            # return
-
-        # Detect cells only within the board
-        empty_cells = detect_board_cells(empty_blurred, board_contour, debug=True)
-
-        # Sort cells by y-coordinate for alignment
-        empty_cells.sort(key=lambda x: x[1])
-
-        # Save cell coordinates to debug file
-        with open('debug_info.txt', 'w') as f:
-            f.write(f"Number of cells detected: {len(empty_cells)}\n")
-            for cell in empty_cells:
-                f.write(f"{cell[0]} {cell[1]}\n")
-
-        # Assign cells to layout
-        populated_layout = assign_cells_to_layout(empty_cells, board_layout)
-
-        # Preprocess the current board image
-        current_image = cv2.imread("board_current_red_test1.jpeg")
-        current_blurred, current_hsv = preprocess_image(current_image, debug=False)
-
-        while True:
-            temp_display = current_blurred.copy()
-            all_marbles = detect_marbles(current_hsv, temp_display, board_contour, debug=True)
-            # cell_occupancy = assign_marbles_to_cells(empty_cells, all_marbles, base_threshold=BASE_THRESHOLD, debug=True)
-            # cell_occupancy = occupancy_by_colour_ratio(empty_cells, current_hsv)
-            cell_occupancy = occupancy_by_colour_ratio_nearest_marble(
-                cells=empty_cells,  # Use the reference cell list
-                marbles=all_marbles, # Pass the list of detected marbles
-                hsv_img=current_hsv,
-                max_association_distance=40, # Tune this distance
-                ratio_threshold=0.15,        # Tune this ratio
-                debug=True                   # Enable debug prints
-            )
-
-            # Output debug information
-            output_debug_info(empty_cells, all_marbles, cell_occupancy, filename='debug_mapping.txt')
-
-            # Visualize results
-            for (cx, cy), marble_color in cell_occupancy.items():
-                if marble_color == "green":
-                    color_draw = (0, 255, 0)  # Green
-                elif marble_color == "red":
-                    color_draw = (0, 0, 255)  # Red
-                else:
-                    color_draw = (255, 0, 0)  # Blue for empty
-
-                cv2.circle(temp_display, (int(cx), int(cy)), 5, color_draw, -1)
-
-            print_text_board(populated_layout, cell_occupancy)
-            cv2.imshow("Final Board State", temp_display)
-
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):
-                break
-
-    except FileNotFoundError as e:
-        logging.error(e)
-    except ValueError as e:
-        logging.error(e)
-
-    cv2.destroyAllWindows()
-    
-    def detect_marbles_by_color_ratio(hsv_image, draw_image, empty_cells, board_contour, 
-                                 sampling_radius=20, ratio_threshold=0.15, debug=False):
-        """
-        Detect marbles using color ratios in circular regions around each potential cell.
-        Returns a list of detected marbles with their positions and colors.
-        
-        Args:
-            hsv_image: HSV image of the current board state
-            draw_image: Image to draw detection visualization on
-            empty_cells: List of (x, y) coordinates for all detected cells
-            board_contour: Detected board contour for filtering
-            sampling_radius: Radius of circular area to sample for color detection
-            ratio_threshold: Minimum ratio of color pixels to consider it a marble
-            debug: Enable debug visualization and logging
-            
-        Returns:
-            List of tuples (x, y, radius, color), representing detected marbles
-        """
-        # Create color masks
-        green_mask = cv2.inRange(hsv_image, GREEN_LOWER, GREEN_UPPER)
-        red_mask1 = cv2.inRange(hsv_image, RED_LOWER1, RED_UPPER1)
-        red_mask2 = cv2.inRange(hsv_image, RED_LOWER2, RED_UPPER2)
-        red_mask = cv2.bitwise_or(red_mask1, red_mask2)
-        
-        # Optional: Save masks for debugging
-        if debug:
-            cv2.imwrite('debug_images/green_mask.jpg', green_mask)
-            cv2.imwrite('debug_images/red_mask.jpg', red_mask)
-        
-        # Apply morphological operations to clean masks
-        kernel = np.ones((5, 5), np.uint8)
-        green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_OPEN, kernel, iterations=1)
-        green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
-        
-        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel, iterations=1)
-        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
-        
-        # Store detected marbles
-        detected_marbles = []
-        
-        # Image dimensions for boundary checking
-        h, w = hsv_image.shape[:2]
-        
-        # Analyze each cell location for marble presence
-        for cx, cy in empty_cells:
-            # Skip if the cell is outside the board contour
-            if board_contour is not None:
-                inside = cv2.pointPolygonTest(board_contour, (cx, cy), False)
-                if inside < 0:  # -1 means outside the contour
-                    continue
-            
-            # Create a circular mask centered at the cell position
-            Y, X = np.ogrid[:h, :w]
-            circle_mask = (X - cx)**2 + (Y - cy)**2 <= sampling_radius**2
-            
-            # Calculate color ratios within the circle
-            pixels_in_circle = np.sum(circle_mask)
-            if pixels_in_circle == 0:
-                continue  # Skip if the circle is off-image
-            
-            green_pixels = np.count_nonzero(green_mask[circle_mask])
-            red_pixels = np.count_nonzero(red_mask[circle_mask])
-            
-            green_ratio = green_pixels / float(pixels_in_circle)
-            red_ratio = red_pixels / float(pixels_in_circle)
-            
-            # Determine if a marble is present and what color
-            if green_ratio >= ratio_threshold and green_ratio >= red_ratio:
-                color = "green"
-                draw_color = (0, 255, 0)  # Green (BGR)
-                
-                # Add to detected marbles list
-                detected_marbles.append((cx, cy, sampling_radius, color))
-                
-                # Draw detected marble for visualization
-                cv2.circle(draw_image, (cx, cy), sampling_radius, draw_color, 2)
-                cv2.circle(draw_image, (cx, cy), 2, (0, 0, 255), 3)  # Center point
-                
-                if debug:
-                    logging.info(f"Detected green marble at ({cx}, {cy}) with green_ratio={green_ratio:.3f}")
-                    
-            elif red_ratio >= ratio_threshold:
-                color = "red"
-                draw_color = (0, 0, 255)  # Red (BGR)
-                
-                # Add to detected marbles list
-                detected_marbles.append((cx, cy, sampling_radius, color))
-                
-                # Draw detected marble for visualization
-                cv2.circle(draw_image, (cx, cy), sampling_radius, draw_color, 2)
-                cv2.circle(draw_image, (cx, cy), 2, (0, 0, 255), 3)  # Center point
-                
-                if debug:
-                    logging.info(f"Detected red marble at ({cx}, {cy}) with red_ratio={red_ratio:.3f}")
-        
-        if debug:
-            logging.info(f"Total marbles detected: {len(detected_marbles)} (Green: {sum(1 for m in detected_marbles if m[3]=='green')}, Red: {sum(1 for m in detected_marbles if m[3]=='red')})")
-    
-        return detected_marbles
 
 def detect_marbles_by_color_ratio(hsv_image, draw_image, empty_cells, board_contour, 
                                  sampling_radius=20, ratio_threshold=0.15, debug=False):
@@ -1257,6 +1079,159 @@ def detect_marbles_by_color_ratio(hsv_image, draw_image, empty_cells, board_cont
         logging.info(f"Total marbles detected: {len(detected_marbles)} (Green: {sum(1 for m in detected_marbles if m[3]=='green')}, Red: {sum(1 for m in detected_marbles if m[3]=='red')})")
     
     return detected_marbles
+
+def improved_cell_occupancy_detection(empty_cells, hsv_image, debug=False):
+    """
+    Direct method to detect occupancy at each cell location using a simple color threshold.
+    
+    Args:
+        empty_cells: List of (x, y) coordinates for known cell positions
+        hsv_image: HSV image of the current board state
+        debug: Enable debug output
+        
+    Returns:
+        dict mapping cell coordinates to occupancy: {(x, y): "green"/"red"/None}
+    """
+    # Create color masks with the predefined thresholds
+    green_mask = cv2.inRange(hsv_image, GREEN_LOWER, GREEN_UPPER)
+    red_mask1 = cv2.inRange(hsv_image, RED_LOWER1, RED_UPPER1)
+    red_mask2 = cv2.inRange(hsv_image, RED_LOWER2, RED_UPPER2)
+    red_mask = cv2.bitwise_or(red_mask1, red_mask2)
+    
+    # Save masks for debugging
+    if debug:
+        cv2.imwrite('debug_images/green_mask.jpg', green_mask)
+        cv2.imwrite('debug_images/red_mask.jpg', red_mask)
+    
+    # Image dimensions
+    h, w = hsv_image.shape[:2]
+    
+    # Directly sample each known cell location with a fixed radius
+    sampling_radius = 20  # Radius to check for color presence
+    threshold_ratio = 0.15  # 15% of pixels must be colored to detect a marble
+    
+    # Initialize result dictionary
+    cell_occupancy = {}
+    
+    # For each known cell location
+    for cx, cy in empty_cells:
+        # Create a circular mask centered at the cell position
+        Y, X = np.ogrid[:h, :w]
+        dist_from_center = (X - cx)**2 + (Y - cy)**2
+        circle_mask = dist_from_center <= sampling_radius**2
+        
+        # Ensure the mask is within image bounds
+        if np.sum(circle_mask) == 0:
+            cell_occupancy[(cx, cy)] = None
+            if debug:
+                logging.debug(f"Cell ({cx},{cy}) is out of image bounds")
+            continue
+        
+        # Count color pixels within the circle
+        green_pixels = np.count_nonzero(green_mask[circle_mask])
+        red_pixels = np.count_nonzero(red_mask[circle_mask])
+        
+        total_pixels = np.sum(circle_mask)
+        green_ratio = green_pixels / float(total_pixels)
+        red_ratio = red_pixels / float(total_pixels)
+        
+        # Determine occupancy based on ratio threshold
+        if green_ratio >= threshold_ratio and green_ratio > red_ratio:
+            cell_occupancy[(cx, cy)] = "green"
+            if debug:
+                logging.info(f"Cell ({cx},{cy}) -> GREEN (ratio: {green_ratio:.3f})")
+        elif red_ratio >= threshold_ratio:
+            cell_occupancy[(cx, cy)] = "red"
+            if debug:
+                logging.info(f"Cell ({cx},{cy}) -> RED (ratio: {red_ratio:.3f})")
+        else:
+            cell_occupancy[(cx, cy)] = None
+            if debug:
+                logging.info(f"Cell ({cx},{cy}) -> EMPTY (green: {green_ratio:.3f}, red: {red_ratio:.3f})")
+    
+    return cell_occupancy
+# ---------------------------
+# Main Function
+# ---------------------------
+def main():
+    try:
+        # Preprocess the empty board image
+        empty_image = cv2.imread("board_empty_test1.jpeg")
+        empty_blurred, empty_hsv = preprocess_image(empty_image, debug=True)
+        
+        # cv2.imshow("Empty Board", empty_blurred)
+
+        # Detect the hexagonal board contour
+        board_contour = detect_board(empty_blurred, debug=True)
+
+        if board_contour is None:
+            logging.error("Board contour not detected. Exiting.")
+            # return
+
+        # Detect cells only within the board
+        empty_cells = detect_board_cells(empty_blurred, board_contour, debug=True)
+
+        # Sort cells by y-coordinate for alignment
+        empty_cells.sort(key=lambda x: x[1])
+
+        # Save cell coordinates to debug file
+        with open('debug_info.txt', 'w') as f:
+            f.write(f"Number of cells detected: {len(empty_cells)}\n")
+            for cell in empty_cells:
+                f.write(f"{cell[0]} {cell[1]}\n")
+
+        # Assign cells to layout
+        populated_layout = assign_cells_to_layout(empty_cells, board_layout)
+
+        # Preprocess the current board image
+        current_image = cv2.imread("board_current_red_test1.jpeg")
+        current_blurred, current_hsv = preprocess_image(current_image, debug=False)
+
+        while True:
+            temp_display = current_blurred.copy()
+            all_marbles = detect_marbles(current_hsv, temp_display, board_contour, debug=True)
+            # cell_occupancy = assign_marbles_to_cells(empty_cells, all_marbles, base_threshold=BASE_THRESHOLD, debug=True)
+            # cell_occupancy = occupancy_by_colour_ratio(empty_cells, current_hsv)
+            cell_occupancy = occupancy_by_colour_ratio_nearest_marble(
+                cells=empty_cells,  # Use the reference cell list
+                marbles=all_marbles, # Pass the list of detected marbles
+                hsv_img=current_hsv,
+                max_association_distance=40, # Tune this distance
+                ratio_threshold=0.15,        # Tune this ratio
+                debug=True                   # Enable debug prints
+            )
+
+            # Output debug information
+            output_debug_info(empty_cells, all_marbles, cell_occupancy, filename='debug_mapping.txt')
+
+            # Visualize results
+            for (cx, cy), marble_color in cell_occupancy.items():
+                if marble_color == "green":
+                    color_draw = (0, 255, 0)  # Green
+                elif marble_color == "red":
+                    color_draw = (0, 0, 255)  # Red
+                else:
+                    color_draw = (255, 0, 0)  # Blue for empty
+
+                cv2.circle(temp_display, (int(cx), int(cy)), 5, color_draw, -1)
+
+            print_text_board(populated_layout, cell_occupancy)
+            cv2.imshow("Final Board State", temp_display)
+
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                break
+
+    except FileNotFoundError as e:
+        logging.error(e)
+    except ValueError as e:
+        logging.error(e)
+
+    cv2.destroyAllWindows()
+    
+    
+
+
 
 
 
