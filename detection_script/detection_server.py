@@ -6,9 +6,7 @@ import base64
 import logging
 import os
 import traceback
-from detection_no_trackbars import (preprocess_image, detect_board, detect_marbles, 
-                                  detect_board_cells, assign_marbles_to_cells, 
-                                  assign_cells_to_layout, board_layout, print_text_board)
+import detection_no_trackbars
 
 app = Flask(__name__)
 
