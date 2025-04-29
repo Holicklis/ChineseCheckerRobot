@@ -321,7 +321,10 @@ def detect_current_state():
             with open('board_state.txt', 'w') as f:
                 for row in board_state:
                     f.write(f"{row}\n")
-            
+            logger.info(jsonify({
+                'board_state': board_state,
+                'message': 'Board state detected successfully'
+            }))
             return jsonify({
                 'board_state': board_state,
                 'message': 'Board state detected successfully'
