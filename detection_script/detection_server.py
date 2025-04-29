@@ -6,15 +6,11 @@ import base64
 import logging
 import os
 import traceback
-import detection_no_trackbars
+import detection_no_trackbars as detector  # Import with alias for clarity
 
 app = Flask(__name__)
 
-# # Configure more detailed logging
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
-# )
+# Configure logging
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
@@ -100,15 +96,16 @@ def upload_empty_board():
         # Process empty board
         empty_board_image = image.copy()
         try:
-            blurred, hsv = preprocess_image(image)
+            # Using imported detector module
+            blurred, hsv = detector.preprocess_image(image)
             save_debug_image(blurred, 'preprocessed_empty_board.jpg')
             
-            board_contour = detect_board(blurred.copy())
+            board_contour = detector.detect_board(blurred.copy())
             if board_contour is None:
-                return jsonify({'error': 'Failed to detect board contour'}), 400
+                logger.warning("No board contour detected, proceeding anyway...")
                 
             # Detect cells
-            empty_cells = detect_board_cells(blurred, board_contour)
+            empty_cells = detector.detect_board_cells(blurred, board_contour)
             if not empty_cells:
                 return jsonify({'error': 'No cells detected on the board'}), 400
             
@@ -141,7 +138,7 @@ def detect_current_state():
     
     try:
         # Check if we have processed empty board
-        if empty_board_image is None or board_contour is None or empty_cells is None:
+        if empty_board_image is None or empty_cells is None:
             return jsonify({'error': 'Empty board not processed yet'}), 400
             
         # Get current board image
@@ -161,32 +158,31 @@ def detect_current_state():
         
         # Process current board state
         try:
-            blurred, hsv = preprocess_image(current_image)
+            # Using imported detector module
+            blurred, hsv = detector.preprocess_image(current_image)
             
-            # Two alternative detection approaches - both should give similar results,
-            # but the direct method may be more reliable in challenging conditions
+            # APPROACH 1: Use the updated detect_marbles function
+            marbles = detector.detect_marbles(hsv, blurred.copy(), board_contour, debug=True)
             
-            # APPROACH 1: Original approach with the updated detect_marbles function
-            marbles = detect_marbles(hsv, blurred.copy(), board_contour)
-            cell_occupancy = assign_marbles_to_cells(empty_cells, marbles)
-            
-            # APPROACH 2: Alternative direct cell occupancy detection
-            # (Uncomment to use as primary method or to compare results)
-            # direct_cell_occupancy = detect_cell_occupancy_directly(empty_cells, hsv, debug=True)
-            
-            # You could potentially combine or validate both approaches:
-            # For example, only trust a cell is occupied if both methods agree
-            # Or use direct_cell_occupancy as fallback if marbles detection finds nothing
-            
-            # If no marbles were detected with the first approach, try the direct approach
+            # If no marbles were detected, try direct cell analysis
             if not marbles:
                 logger.warning("No marbles detected with standard approach, trying direct cell analysis")
-                cell_occupancy = detect_cell_occupancy_directly(empty_cells, hsv, debug=True)
+                cell_occupancy = detector.detect_cell_occupancy_directly(empty_cells, hsv, debug=True)
                 if not any(value is not None for value in cell_occupancy.values()):
                     return jsonify({'error': 'No marbles detected on the board'}), 400
+            else:
+                # Map marbles to cells 
+                cell_occupancy = detector.occupancy_by_colour_ratio_nearest_marble(
+                    cells=empty_cells,
+                    marbles=marbles,
+                    hsv_img=hsv,
+                    max_association_distance=40,
+                    ratio_threshold=0.15,
+                    debug=True
+                )
             
             # Map cells to board layout
-            populated_layout = assign_cells_to_layout(empty_cells, board_layout)
+            populated_layout = detector.assign_cells_to_layout(empty_cells, detector.board_layout)
             
             # Generate board state visualization
             visualization = blurred.copy()
@@ -241,7 +237,6 @@ def detect_current_state():
         logger.debug(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
     
-    
 @app.route('/list_debug_images', methods=['GET'])
 def list_debug_images():
     """List all available debug images"""
@@ -293,6 +288,9 @@ if __name__ == '__main__':
     
     # Use port 5001 by default
     port = int(os.environ.get('PORT', 5001))
+    
+    # Output server IP for easier connection
+    logger.info(f"Starting server on 0.0.0.0:{port}")
     
     # Start the server
     app.run(host='0.0.0.0', port=port, debug=False)
