@@ -34,17 +34,9 @@ def ensure_debug_dir():
 
 def save_debug_image(image, filename):
     """Save image for debugging purposes with error handling"""
-    try:
-        debug_dir = ensure_debug_dir()
-        filepath = os.path.join(debug_dir, filename)
-        success = cv2.imwrite(filepath, image)
-        if not success:
-            logger.error(f"Failed to save image to {filepath}")
-        else:
-            logger.info(f"Saved debug image to {filepath}")
-    except Exception as e:
-        logger.error(f"Error saving debug image: {str(e)}")
-        logger.debug(traceback.format_exc())
+    ok = cv2.imwrite(os.path.join(DEBUG_DIR, name), img)
+    if not ok:
+        logger.error("imwrite failed – path or permissions?")
 
 def decode_image(image_data):
     """Decode base64 image data to OpenCV format with enhanced error handling"""
