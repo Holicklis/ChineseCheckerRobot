@@ -1114,7 +1114,11 @@ def improved_cell_occupancy_detection(empty_cells, hsv_image, debug=False):
     cell_occupancy = {}
     
     # For each known cell location
-    for cx, cy in empty_cells:
+    for cell in empty_cells:
+        # Ensure we're working with a tuple
+        cell_tuple = tuple(cell)
+        cx, cy = cell_tuple
+        
         # Create a circular mask centered at the cell position
         Y, X = np.ogrid[:h, :w]
         dist_from_center = (X - cx)**2 + (Y - cy)**2
@@ -1122,7 +1126,7 @@ def improved_cell_occupancy_detection(empty_cells, hsv_image, debug=False):
         
         # Ensure the mask is within image bounds
         if np.sum(circle_mask) == 0:
-            cell_occupancy[(cx, cy)] = None
+            cell_occupancy[cell_tuple] = None
             if debug:
                 logging.debug(f"Cell ({cx},{cy}) is out of image bounds")
             continue
@@ -1137,15 +1141,15 @@ def improved_cell_occupancy_detection(empty_cells, hsv_image, debug=False):
         
         # Determine occupancy based on ratio threshold
         if green_ratio >= threshold_ratio and green_ratio > red_ratio:
-            cell_occupancy[(cx, cy)] = "green"
+            cell_occupancy[cell_tuple] = "green"
             if debug:
                 logging.info(f"Cell ({cx},{cy}) -> GREEN (ratio: {green_ratio:.3f})")
         elif red_ratio >= threshold_ratio:
-            cell_occupancy[(cx, cy)] = "red"
+            cell_occupancy[cell_tuple] = "red"
             if debug:
                 logging.info(f"Cell ({cx},{cy}) -> RED (ratio: {red_ratio:.3f})")
         else:
-            cell_occupancy[(cx, cy)] = None
+            cell_occupancy[cell_tuple] = None
             if debug:
                 logging.info(f"Cell ({cx},{cy}) -> EMPTY (green: {green_ratio:.3f}, red: {red_ratio:.3f})")
     

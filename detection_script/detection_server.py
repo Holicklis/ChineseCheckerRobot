@@ -304,7 +304,9 @@ def detect_current_state():
                     if cell is None:
                         row_state.append('X')  # No cell detected here
                     else:
-                        occupant = cell_occupancy.get(cell, None)
+                        # Fix: Ensure we're using the tuple as the key
+                        # This is the key fix - make sure cell is properly used as a key
+                        occupant = cell_occupancy.get(tuple(cell), None)
                         if occupant is None:
                             row_state.append('.')  # Empty cell
                         elif occupant == "green":
