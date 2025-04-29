@@ -13,3 +13,4 @@
 .externalNativeBuild
 .cxx
 local.properties
+detection_script/debug_images/
