@@ -164,13 +164,30 @@ def detect_current_state():
         # Process current board state
         try:
             blurred, hsv = preprocess_image(current_image)
+            
+            # Two alternative detection approaches - both should give similar results,
+            # but the direct method may be more reliable in challenging conditions
+            
+            # APPROACH 1: Original approach with the updated detect_marbles function
             marbles = detect_marbles(hsv, blurred.copy(), board_contour)
-            
-            if not marbles:
-                return jsonify({'error': 'No marbles detected on the board'}), 400
-            
-            # Map marbles to cells
             cell_occupancy = assign_marbles_to_cells(empty_cells, marbles)
+            
+            # APPROACH 2: Alternative direct cell occupancy detection
+            # (Uncomment to use as primary method or to compare results)
+            # direct_cell_occupancy = detect_cell_occupancy_directly(empty_cells, hsv, debug=True)
+            
+            # You could potentially combine or validate both approaches:
+            # For example, only trust a cell is occupied if both methods agree
+            # Or use direct_cell_occupancy as fallback if marbles detection finds nothing
+            
+            # If no marbles were detected with the first approach, try the direct approach
+            if not marbles:
+                logger.warning("No marbles detected with standard approach, trying direct cell analysis")
+                cell_occupancy = detect_cell_occupancy_directly(empty_cells, hsv, debug=True)
+                if not any(value is not None for value in cell_occupancy.values()):
+                    return jsonify({'error': 'No marbles detected on the board'}), 400
+            
+            # Map cells to board layout
             populated_layout = assign_cells_to_layout(empty_cells, board_layout)
             
             # Generate board state visualization
@@ -180,6 +197,11 @@ def detect_current_state():
                        (0, 0, 255) if marble_color == "red" else \
                        (255, 0, 0)
                 cv2.circle(visualization, (int(cx), int(cy)), 5, color, -1)
+                
+                # Also draw a larger circle to show the sampling area
+                # This is useful for debugging the color ratio approach
+                cv2.circle(visualization, (int(cx), int(cy)), 20, color, 1)
+                
             save_debug_image(visualization, 'board_state.jpg')
             
             # Generate text representation

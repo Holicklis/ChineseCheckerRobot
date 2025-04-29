@@ -561,11 +561,48 @@ def occupancy_by_colour_ratio(cells, hsv_img):
     return occ
 
 
-def detect_marbles(hsv_image, draw_image, board_contour, debug = False):
+# def detect_marbles(hsv_image, draw_image, board_contour, debug = False):
+#     """
+#     Using predefined HSV thresholds for green/red,
+#     detect marbles and return a combined list of them.
+#     Only marbles inside the board are considered.
+#     """
+#     # Create masks for green and red
+#     green_mask = cv2.inRange(hsv_image, GREEN_LOWER, GREEN_UPPER)
+#     red_mask1 = cv2.inRange(hsv_image, RED_LOWER1, RED_UPPER1)
+#     red_mask2 = cv2.inRange(hsv_image, RED_LOWER2, RED_UPPER2)
+#     red_mask = cv2.bitwise_or(red_mask1, red_mask2)
+
+#     # Morphological cleaning
+#     kernel = np.ones((5, 5), np.uint8)
+#     green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_OPEN, kernel, iterations=2)
+#     green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    
+#     kernel2 = np.ones((3,3), np.uint8)
+#     green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel2, iterations=1)
+#     red_mask   = cv2.morphologyEx(red_mask,   cv2.MORPH_CLOSE, kernel2, iterations=1)
+
+    
+#     #save greenmask to directory debug_images
+#     cv2.imwrite('debug_images/green_mask.jpg', green_mask)
+#     cv2.imwrite('debug_images/red_mask.jpg', red_mask)
+    
+#     red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel, iterations=2)
+#     red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    
+
+    
+#     # Detect circles
+#     green_marbles = detect_and_draw_circles(green_mask, draw_image, "green", board_contour)
+#     red_marbles = detect_and_draw_circles(red_mask, draw_image, "red", board_contour)
+
+#     return green_marbles + red_marbles
+
+def detect_marbles(hsv_image, draw_image, board_contour, debug=False):
     """
-    Using predefined HSV thresholds for green/red,
-    detect marbles and return a combined list of them.
-    Only marbles inside the board are considered.
+    Using color ratio analysis instead of circularity detection,
+    identify marbles based on their color signatures.
+    Returns the same format as the original function for compatibility.
     """
     # Create masks for green and red
     green_mask = cv2.inRange(hsv_image, GREEN_LOWER, GREEN_UPPER)
@@ -575,28 +612,194 @@ def detect_marbles(hsv_image, draw_image, board_contour, debug = False):
 
     # Morphological cleaning
     kernel = np.ones((5, 5), np.uint8)
-    green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_OPEN, kernel, iterations=2)
+    green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_OPEN, kernel, iterations=1)
     green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
     
-    kernel2 = np.ones((3,3), np.uint8)
-    green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel2, iterations=1)
-    red_mask   = cv2.morphologyEx(red_mask,   cv2.MORPH_CLOSE, kernel2, iterations=1)
-
-    
-    #save greenmask to directory debug_images
-    cv2.imwrite('debug_images/green_mask.jpg', green_mask)
-    cv2.imwrite('debug_images/red_mask.jpg', red_mask)
-    
-    red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel, iterations=2)
+    red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel, iterations=1)
     red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
     
-
+    # Save masks for debugging
+    if debug:
+        cv2.imwrite('debug_images/green_mask.jpg', green_mask)
+        cv2.imwrite('debug_images/red_mask.jpg', red_mask)
     
-    # Detect circles
-    green_marbles = detect_and_draw_circles(green_mask, draw_image, "green", board_contour)
-    red_marbles = detect_and_draw_circles(red_mask, draw_image, "red", board_contour)
+    # Image dimensions
+    h, w = hsv_image.shape[:2]
+    
+    # Instead of looking for circles, we'll analyze the area around detected marbles
+    # The sampling radius should be approximately the size of a marble
+    sampling_radius = 20
+    ratio_threshold = 0.15  # Minimum ratio of colored pixels to consider a marble
+    
+    # Store detected marbles
+    detected_marbles = []
+    
+    # For compatibility with your existing system, we still need to retain the
+    # format of [(x, y, radius, color), ...] for detected marbles
+    
+    # Use blob detection or other methods to find potential marble centers
+    # Here we'll use connected components on the color masks
+    
+    # Process green marbles
+    green_components = cv2.connectedComponentsWithStats(green_mask, connectivity=8)
+    for i in range(1, green_components[0]):  # Skip the background (id=0)
+        # Get component stats
+        stats = green_components[2][i]
+        area = stats[cv2.CC_STAT_AREA]
+        
+        # Filter small or very large components
+        if area < 50 or area > 2000:
+            continue
+            
+        # Get centroid
+        centroids = green_components[3]
+        cx, cy = centroids[i]
+        cx, cy = int(cx), int(cy)
+        
+        # Check if it's inside the board contour
+        if board_contour is not None:
+            inside = cv2.pointPolygonTest(board_contour, (cx, cy), False)
+            if inside < 0:  # -1 means outside the contour
+                continue
+                
+        # Calculate color ratio in a circle around this point
+        Y, X = np.ogrid[:h, :w]
+        dist_from_center = (X - cx)**2 + (Y - cy)**2
+        circle_mask = dist_from_center <= sampling_radius**2
+        
+        # Ensure the circle mask is within image bounds
+        if np.sum(circle_mask) == 0:
+            continue
+            
+        # Calculate green ratio within circle
+        green_pixels = np.count_nonzero(green_mask[circle_mask])
+        green_ratio = green_pixels / float(np.sum(circle_mask))
+        
+        # If strong enough green presence, consider it a green marble
+        if green_ratio >= ratio_threshold:
+            # Add to detected marbles with the format your existing code expects
+            detected_marbles.append((cx, cy, sampling_radius, "green"))
+            
+            # Draw visualization
+            cv2.circle(draw_image, (cx, cy), sampling_radius, (0, 255, 0), 2)
+            cv2.circle(draw_image, (cx, cy), 2, (0, 0, 255), 3)
+            
+            if debug:
+                logging.info(f"Detected green marble at ({cx}, {cy}) with green_ratio={green_ratio:.3f}")
+    
+    # Process red marbles (same approach)
+    red_components = cv2.connectedComponentsWithStats(red_mask, connectivity=8)
+    for i in range(1, red_components[0]):
+        stats = red_components[2][i]
+        area = stats[cv2.CC_STAT_AREA]
+        
+        if area < 50 or area > 2000:
+            continue
+            
+        centroids = red_components[3]
+        cx, cy = centroids[i]
+        cx, cy = int(cx), int(cy)
+        
+        if board_contour is not None:
+            inside = cv2.pointPolygonTest(board_contour, (cx, cy), False)
+            if inside < 0:
+                continue
+                
+        Y, X = np.ogrid[:h, :w]
+        dist_from_center = (X - cx)**2 + (Y - cy)**2
+        circle_mask = dist_from_center <= sampling_radius**2
+        
+        if np.sum(circle_mask) == 0:
+            continue
+            
+        red_pixels = np.count_nonzero(red_mask[circle_mask])
+        red_ratio = red_pixels / float(np.sum(circle_mask))
+        
+        if red_ratio >= ratio_threshold:
+            detected_marbles.append((cx, cy, sampling_radius, "red"))
+            
+            cv2.circle(draw_image, (cx, cy), sampling_radius, (0, 0, 255), 2)
+            cv2.circle(draw_image, (cx, cy), 2, (0, 0, 255), 3)
+            
+            if debug:
+                logging.info(f"Detected red marble at ({cx}, {cy}) with red_ratio={red_ratio:.3f}")
+    
+    # Optional fallback: If no marbles were found with blob detection,
+    # analyze each empty cell location directly
+    if not detected_marbles:
+        # This requires access to empty_cells, which may need to be passed
+        # as an additional parameter or made global if this approach is needed
+        logging.warning("No marbles detected with blob detection, consider direct cell analysis")
+    
+    if debug:
+        logging.info(f"Total marbles detected: {len(detected_marbles)} (Green: {sum(1 for m in detected_marbles if m[3]=='green')}, Red: {sum(1 for m in detected_marbles if m[3]=='red')})")
+    
+    return detected_marbles
 
-    return green_marbles + red_marbles
+def detect_cell_occupancy_directly(empty_cells, hsv_image, debug=False):
+    """
+    Alternative method to directly detect occupancy at each cell location
+    without the intermediate step of detecting marbles.
+    
+    This can be used as a fallback or validation approach.
+    """
+    # Create color masks
+    green_mask = cv2.inRange(hsv_image, GREEN_LOWER, GREEN_UPPER)
+    red_mask1 = cv2.inRange(hsv_image, RED_LOWER1, RED_UPPER1)
+    red_mask2 = cv2.inRange(hsv_image, RED_LOWER2, RED_UPPER2)
+    red_mask = cv2.bitwise_or(red_mask1, red_mask2)
+    
+    # Apply morphological operations
+    kernel = np.ones((5, 5), np.uint8)
+    green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+    green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    
+    red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+    red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    
+    # Image dimensions
+    h, w = hsv_image.shape[:2]
+    
+    # Sampling parameters
+    sampling_radius = 20
+    ratio_threshold = 0.15
+    
+    # Initialize cell occupancy dictionary
+    cell_occupancy = {}
+    
+    # Analyze each cell location
+    for cx, cy in empty_cells:
+        # Create a circular mask centered at the cell position
+        Y, X = np.ogrid[:h, :w]
+        circle_mask = (X - cx)**2 + (Y - cy)**2 <= sampling_radius**2
+        
+        # Calculate color ratios
+        pixels_in_circle = np.sum(circle_mask)
+        if pixels_in_circle == 0:
+            cell_occupancy[(cx, cy)] = None
+            continue
+        
+        green_pixels = np.count_nonzero(green_mask[circle_mask])
+        red_pixels = np.count_nonzero(red_mask[circle_mask])
+        
+        green_ratio = green_pixels / float(pixels_in_circle)
+        red_ratio = red_pixels / float(pixels_in_circle)
+        
+        # Determine occupancy based on dominant color
+        if green_ratio >= ratio_threshold and green_ratio >= red_ratio:
+            cell_occupancy[(cx, cy)] = "green"
+            if debug:
+                logging.info(f"Cell ({cx}, {cy}) -> green (ratio={green_ratio:.3f})")
+        elif red_ratio >= ratio_threshold:
+            cell_occupancy[(cx, cy)] = "red"
+            if debug:
+                logging.info(f"Cell ({cx}, {cy}) -> red (ratio={red_ratio:.3f})")
+        else:
+            cell_occupancy[(cx, cy)] = None
+            if debug:
+                logging.info(f"Cell ({cx}, {cy}) -> empty (green={green_ratio:.3f}, red={red_ratio:.3f})")
+    
+    return cell_occupancy
 
 # ---------------------------
 # Debug Mapping Information
@@ -854,6 +1057,209 @@ def main():
         logging.error(e)
 
     cv2.destroyAllWindows()
+    
+    def detect_marbles_by_color_ratio(hsv_image, draw_image, empty_cells, board_contour, 
+                                 sampling_radius=20, ratio_threshold=0.15, debug=False):
+        """
+        Detect marbles using color ratios in circular regions around each potential cell.
+        Returns a list of detected marbles with their positions and colors.
+        
+        Args:
+            hsv_image: HSV image of the current board state
+            draw_image: Image to draw detection visualization on
+            empty_cells: List of (x, y) coordinates for all detected cells
+            board_contour: Detected board contour for filtering
+            sampling_radius: Radius of circular area to sample for color detection
+            ratio_threshold: Minimum ratio of color pixels to consider it a marble
+            debug: Enable debug visualization and logging
+            
+        Returns:
+            List of tuples (x, y, radius, color), representing detected marbles
+        """
+        # Create color masks
+        green_mask = cv2.inRange(hsv_image, GREEN_LOWER, GREEN_UPPER)
+        red_mask1 = cv2.inRange(hsv_image, RED_LOWER1, RED_UPPER1)
+        red_mask2 = cv2.inRange(hsv_image, RED_LOWER2, RED_UPPER2)
+        red_mask = cv2.bitwise_or(red_mask1, red_mask2)
+        
+        # Optional: Save masks for debugging
+        if debug:
+            cv2.imwrite('debug_images/green_mask.jpg', green_mask)
+            cv2.imwrite('debug_images/red_mask.jpg', red_mask)
+        
+        # Apply morphological operations to clean masks
+        kernel = np.ones((5, 5), np.uint8)
+        green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+        
+        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+        
+        # Store detected marbles
+        detected_marbles = []
+        
+        # Image dimensions for boundary checking
+        h, w = hsv_image.shape[:2]
+        
+        # Analyze each cell location for marble presence
+        for cx, cy in empty_cells:
+            # Skip if the cell is outside the board contour
+            if board_contour is not None:
+                inside = cv2.pointPolygonTest(board_contour, (cx, cy), False)
+                if inside < 0:  # -1 means outside the contour
+                    continue
+            
+            # Create a circular mask centered at the cell position
+            Y, X = np.ogrid[:h, :w]
+            circle_mask = (X - cx)**2 + (Y - cy)**2 <= sampling_radius**2
+            
+            # Calculate color ratios within the circle
+            pixels_in_circle = np.sum(circle_mask)
+            if pixels_in_circle == 0:
+                continue  # Skip if the circle is off-image
+            
+            green_pixels = np.count_nonzero(green_mask[circle_mask])
+            red_pixels = np.count_nonzero(red_mask[circle_mask])
+            
+            green_ratio = green_pixels / float(pixels_in_circle)
+            red_ratio = red_pixels / float(pixels_in_circle)
+            
+            # Determine if a marble is present and what color
+            if green_ratio >= ratio_threshold and green_ratio >= red_ratio:
+                color = "green"
+                draw_color = (0, 255, 0)  # Green (BGR)
+                
+                # Add to detected marbles list
+                detected_marbles.append((cx, cy, sampling_radius, color))
+                
+                # Draw detected marble for visualization
+                cv2.circle(draw_image, (cx, cy), sampling_radius, draw_color, 2)
+                cv2.circle(draw_image, (cx, cy), 2, (0, 0, 255), 3)  # Center point
+                
+                if debug:
+                    logging.info(f"Detected green marble at ({cx}, {cy}) with green_ratio={green_ratio:.3f}")
+                    
+            elif red_ratio >= ratio_threshold:
+                color = "red"
+                draw_color = (0, 0, 255)  # Red (BGR)
+                
+                # Add to detected marbles list
+                detected_marbles.append((cx, cy, sampling_radius, color))
+                
+                # Draw detected marble for visualization
+                cv2.circle(draw_image, (cx, cy), sampling_radius, draw_color, 2)
+                cv2.circle(draw_image, (cx, cy), 2, (0, 0, 255), 3)  # Center point
+                
+                if debug:
+                    logging.info(f"Detected red marble at ({cx}, {cy}) with red_ratio={red_ratio:.3f}")
+        
+        if debug:
+            logging.info(f"Total marbles detected: {len(detected_marbles)} (Green: {sum(1 for m in detected_marbles if m[3]=='green')}, Red: {sum(1 for m in detected_marbles if m[3]=='red')})")
+    
+        return detected_marbles
+
+def detect_marbles_by_color_ratio(hsv_image, draw_image, empty_cells, board_contour, 
+                                 sampling_radius=20, ratio_threshold=0.15, debug=False):
+    """
+    Detect marbles using color ratios in circular regions around each potential cell.
+    Returns a list of detected marbles with their positions and colors.
+    
+    Args:
+        hsv_image: HSV image of the current board state
+        draw_image: Image to draw detection visualization on
+        empty_cells: List of (x, y) coordinates for all detected cells
+        board_contour: Detected board contour for filtering
+        sampling_radius: Radius of circular area to sample for color detection
+        ratio_threshold: Minimum ratio of color pixels to consider it a marble
+        debug: Enable debug visualization and logging
+        
+    Returns:
+        List of tuples (x, y, radius, color), representing detected marbles
+    """
+    # Create color masks
+    green_mask = cv2.inRange(hsv_image, GREEN_LOWER, GREEN_UPPER)
+    red_mask1 = cv2.inRange(hsv_image, RED_LOWER1, RED_UPPER1)
+    red_mask2 = cv2.inRange(hsv_image, RED_LOWER2, RED_UPPER2)
+    red_mask = cv2.bitwise_or(red_mask1, red_mask2)
+    
+    # Optional: Save masks for debugging
+    if debug:
+        cv2.imwrite('debug_images/green_mask.jpg', green_mask)
+        cv2.imwrite('debug_images/red_mask.jpg', red_mask)
+    
+    # Apply morphological operations to clean masks
+    kernel = np.ones((5, 5), np.uint8)
+    green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+    green_mask = cv2.morphologyEx(green_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    
+    red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+    red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    
+    # Store detected marbles
+    detected_marbles = []
+    
+    # Image dimensions for boundary checking
+    h, w = hsv_image.shape[:2]
+    
+    # Analyze each cell location for marble presence
+    for cx, cy in empty_cells:
+        # Skip if the cell is outside the board contour
+        if board_contour is not None:
+            inside = cv2.pointPolygonTest(board_contour, (cx, cy), False)
+            if inside < 0:  # -1 means outside the contour
+                continue
+        
+        # Create a circular mask centered at the cell position
+        Y, X = np.ogrid[:h, :w]
+        circle_mask = (X - cx)**2 + (Y - cy)**2 <= sampling_radius**2
+        
+        # Calculate color ratios within the circle
+        pixels_in_circle = np.sum(circle_mask)
+        if pixels_in_circle == 0:
+            continue  # Skip if the circle is off-image
+        
+        green_pixels = np.count_nonzero(green_mask[circle_mask])
+        red_pixels = np.count_nonzero(red_mask[circle_mask])
+        
+        green_ratio = green_pixels / float(pixels_in_circle)
+        red_ratio = red_pixels / float(pixels_in_circle)
+        
+        # Determine if a marble is present and what color
+        if green_ratio >= ratio_threshold and green_ratio >= red_ratio:
+            color = "green"
+            draw_color = (0, 255, 0)  # Green (BGR)
+            
+            # Add to detected marbles list
+            detected_marbles.append((cx, cy, sampling_radius, color))
+            
+            # Draw detected marble for visualization
+            cv2.circle(draw_image, (cx, cy), sampling_radius, draw_color, 2)
+            cv2.circle(draw_image, (cx, cy), 2, (0, 0, 255), 3)  # Center point
+            
+            if debug:
+                logging.info(f"Detected green marble at ({cx}, {cy}) with green_ratio={green_ratio:.3f}")
+                
+        elif red_ratio >= ratio_threshold:
+            color = "red"
+            draw_color = (0, 0, 255)  # Red (BGR)
+            
+            # Add to detected marbles list
+            detected_marbles.append((cx, cy, sampling_radius, color))
+            
+            # Draw detected marble for visualization
+            cv2.circle(draw_image, (cx, cy), sampling_radius, draw_color, 2)
+            cv2.circle(draw_image, (cx, cy), 2, (0, 0, 255), 3)  # Center point
+            
+            if debug:
+                logging.info(f"Detected red marble at ({cx}, {cy}) with red_ratio={red_ratio:.3f}")
+    
+    if debug:
+        logging.info(f"Total marbles detected: {len(detected_marbles)} (Green: {sum(1 for m in detected_marbles if m[3]=='green')}, Red: {sum(1 for m in detected_marbles if m[3]=='red')})")
+    
+    return detected_marbles
+
+
+
 
 # ---------------------------
 # Entry Point
