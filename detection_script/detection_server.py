@@ -267,7 +267,7 @@ def detect_current_state():
             save_debug_image(blurred, 'preprocessed_current_board.jpg')
             
             # Use the improved direct cell occupancy detection
-            cell_occupancy = improved_cell_occupancy_detection(empty_cells, hsv, debug=True)
+            cell_occupancy = detector.improved_cell_occupancy_detection(empty_cells, hsv, debug=True)
             
             # Check if any marbles were detected
             if not any(val is not None for val in cell_occupancy.values()):
